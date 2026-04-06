@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v2.1
+-- EbonholdAutoLoot  v2.2
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -52,9 +52,12 @@ local DEFAULTS = {
     sellRare      = false,
     sellEpic      = false,
     blacklist     = {},
-    checkInterval = 3,     -- seconds between free-slot checks while looting
-    windowX       = 100,
-    windowY       = -200,
+    checkInterval  = 3,     -- seconds between free-slot checks while looting
+    windowX        = 100,
+    windowY        = -200,
+    vendorBtnX     = 100,   -- on-screen vendor button position (TOPLEFT from UIParent)
+    vendorBtnY     = -400,
+    vendorBtnShown = true,
 }
 
 -------------------------------------------------------------------------------
@@ -68,6 +71,8 @@ local waitingForMerchant = false
 -- GUI handles populated by EAL_BuildGUI
 local g_statusLabel
 local g_enableBtn
+local g_vendorBtn                 -- on-screen SecureActionButton (UIParent child)
+local g_vendorBtnToggle           -- GUI button that shows/hides g_vendorBtn
 local g_blacklistRows   = {}
 local g_blacklistOffset = 0   -- hand-rolled scroll offset (no FauxScrollFrame)
 local g_scrollThumb               -- visual-only scrollbar thumb
@@ -399,43 +404,71 @@ local function OnUpdate(self, elapsed)
 end
 
 -------------------------------------------------------------------------------
--- 7. VENDOR MACRO + KEYBIND
+-- 7. ON-SCREEN VENDOR BUTTON
 -------------------------------------------------------------------------------
-local VENDOR_MACRO_NAME = "VendorBind"
-local VENDOR_MACRO_ICON = "INV_Misc_QuestionMark"
-local VENDOR_MACRO_BODY = "/target " .. VENDOR_PET_NAME   -- "/target Goblin Merchant"
-local VENDOR_BIND_KEY   = "F5"   -- key bound to the targeting macro
+-- A SecureActionButtonTemplate button parented directly to UIParent.
+-- Its attribute is set once at creation (outside combat) so it remains
+-- functional even when InCombatLockdown() is true.
+-- Clicking it runs:  /target Goblin Merchant
+-- The player then presses their Interact with Target keybind to open the
+-- vendor window — MERCHANT_SHOW fires and the addon handles the rest.
+local function EAL_BuildVendorButton()
+    local btn = CreateFrame("Button", "EAL_VendorBtn", UIParent,
+                            "SecureActionButtonTemplate")
+    btn:SetSize(60, 60)
+    btn:SetPoint("TOPLEFT", UIParent, "TOPLEFT",
+                 EAL_DB.vendorBtnX, EAL_DB.vendorBtnY)
+    btn:SetMovable(true)
+    btn:EnableMouse(true)
+    btn:RegisterForClicks("AnyUp")
+    btn:SetFrameStrata("MEDIUM")
 
--- Creates the per-character macro and binds VENDOR_BIND_KEY to it.
--- A separate key for INTERACTTARGET must be set by the player in Keybindings
--- (Key bindings → Targeting → Interact with Target).
--- Must be called outside combat — CreateMacro and SetBinding are both
--- blocked by InCombatLockdown().
-local function EAL_CreateVendorMacro()
-    if InCombatLockdown() then
-        Print("|cffff4444Cannot set up macro during combat.|r Try again after leaving combat.")
-        return false
-    end
+    -- Attribute locked in at creation — valid during combat lockdown
+    btn:SetAttribute("type", "macro")
+    btn:SetAttribute("macrotext", "/target " .. VENDOR_PET_NAME)
 
-    -- Create the macro if it doesn't already exist (per-character slot)
-    local idx = GetMacroIndexByName(VENDOR_MACRO_NAME)
-    if not idx or idx == 0 then
-        local _, numChar = GetNumMacros()
-        if numChar >= 18 then
-            Print("|cffff4444Per-character macro book full (18/18).|r Delete a macro and try again.")
-            return false
-        end
-        CreateMacro(VENDOR_MACRO_NAME, VENDOR_MACRO_ICON, VENDOR_MACRO_BODY, 1)
-        Print("|cffffff00" .. VENDOR_MACRO_NAME .. "|r macro created.")
-    end
+    -- Icon
+    local tex = btn:CreateTexture(nil, "BACKGROUND")
+    tex:SetAllPoints()
+    tex:SetTexture("Interface\\Icons\\INV_Misc_Coin_02")
 
-    -- Bind the target key to the macro
-    SetBinding(VENDOR_BIND_KEY, "MACRO " .. VENDOR_MACRO_NAME)
-    SaveBindings(2)   -- 2 = per-character bindings
+    -- Gold border overlay
+    local border = btn:CreateTexture(nil, "OVERLAY")
+    border:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+    border:SetBlendMode("ADD")
+    border:SetWidth(66); border:SetHeight(66)
+    border:SetPoint("CENTER")
+    border:SetVertexColor(1, 0.75, 0.1, 0.85)
 
-    Print("|cffffff00" .. VENDOR_BIND_KEY .. "|r → targets " .. VENDOR_PET_NAME ..
-          "  |  then press your |cffffff00Interact with Target|r key to open the vendor.")
-    return true
+    -- Label above the button
+    local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetPoint("BOTTOM", btn, "TOP", 0, 2)
+    lbl:SetText("|cffff9900Vendor|r")
+
+    -- Alt+drag to reposition; save new position to SavedVariables
+    btn:SetScript("OnMouseDown", function(self, button)
+        if IsAltKeyDown() then self:StartMoving() end
+    end)
+    btn:SetScript("OnMouseUp", function(self)
+        self:StopMovingOrSizing()
+        EAL_DB.vendorBtnX = self:GetLeft()
+        EAL_DB.vendorBtnY = self:GetTop() - UIParent:GetHeight()
+    end)
+
+    -- Tooltip
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("|cffff9900Target Goblin Merchant|r")
+        GameTooltip:AddLine("|cffaaaaaaClick to target the vendor companion|r")
+        GameTooltip:AddLine("|cffaaaaaaThen press Interact with Target to sell|r")
+        GameTooltip:AddLine("|cffaaaaaaAlt+Drag to reposition|r")
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    if not EAL_DB.vendorBtnShown then btn:Hide() end
+
+    return btn
 end
 
 -------------------------------------------------------------------------------
@@ -544,21 +577,40 @@ local function EAL_BuildGUI()
     sellNowBtn:SetScript("OnClick", function() StartSellCycle() end)
 
     -- ----------------------------------------------------------------
-    -- Vendor macro row
+    -- Vendor button row
     -- ----------------------------------------------------------------
     MakeDivider(win, -114)
 
-    local macroHint = win:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    macroHint:SetPoint("TOPLEFT", 18, -126)
-    macroHint:SetWidth(210)
-    macroHint:SetJustifyH("LEFT")
-    macroHint:SetText("|cffaaaaaa[F5] targets vendor  |  then press Interact key|r")
+    local vendorHint = win:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    vendorHint:SetPoint("TOPLEFT", 18, -126)
+    vendorHint:SetWidth(210)
+    vendorHint:SetJustifyH("LEFT")
+    vendorHint:SetText("|cffaaaaaaClick vendor button → then Interact key to sell|r")
 
-    local macroBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
-    macroBtn:SetPoint("TOPLEFT", 232, -122)
-    macroBtn:SetWidth(90); macroBtn:SetHeight(22)
-    macroBtn:SetText("Bind F5")
-    macroBtn:SetScript("OnClick", function() EAL_CreateVendorMacro() end)
+    local function UpdateVendorToggleBtn(btn)
+        if EAL_DB.vendorBtnShown then
+            btn:SetText("Hide Vendor Btn")
+        else
+            btn:SetText("Show Vendor Btn")
+        end
+    end
+
+    local vendorToggle = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
+    vendorToggle:SetPoint("TOPLEFT", 232, -122)
+    vendorToggle:SetWidth(90); vendorToggle:SetHeight(22)
+    UpdateVendorToggleBtn(vendorToggle)
+    vendorToggle:SetScript("OnClick", function(self)
+        EAL_DB.vendorBtnShown = not EAL_DB.vendorBtnShown
+        if g_vendorBtn then
+            if EAL_DB.vendorBtnShown then
+                g_vendorBtn:Show()
+            else
+                g_vendorBtn:Hide()
+            end
+        end
+        UpdateVendorToggleBtn(self)
+    end)
+    g_vendorBtnToggle = vendorToggle
 
     -- ----------------------------------------------------------------
     -- Quality sell toggles
@@ -739,9 +791,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 end
             end
         end
-        gui = EAL_BuildGUI()
-        EAL_CreateVendorMacro()   -- auto-create at login (always outside combat)
-        Print("v2.1 loaded.  |cffffff00/eal|r to open settings.")
+        gui       = EAL_BuildGUI()
+        g_vendorBtn = EAL_BuildVendorButton()
+        Print("v2.2 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()

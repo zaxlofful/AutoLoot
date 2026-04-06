@@ -1,5 +1,16 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.2] - 2026-04-06
+
+### Added
+- **On-screen vendor button** (`EAL_VendorBtn`): a 60×60 `SecureActionButtonTemplate` button parented directly to `UIParent`. Its `type=macro` / `macrotext=/target Goblin Merchant` attribute is set once at creation (outside combat) so it fires correctly even during combat lockdown — no `PreClick` toggling, no `SetAttribute` calls in combat. Features a coin icon, gold border overlay, "Vendor" label, tooltip, and **Alt+Drag** to reposition with position saved to `SavedVariables`.
+- **Show/Hide Vendor Btn** toggle in the GUI replaces the old "Bind F5" button. State persisted via `vendorBtnShown` in `SavedVariables`.
+
+### Removed
+- Macro + keybind approach (`VendorBind` macro, `SetBinding("F5", ...)`, `SaveBindings`). Replaced entirely by the on-screen secure button.
+
+---
+
 ## [2.1] - 2026-04-06
 
 ### Changed
