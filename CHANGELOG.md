@@ -1,5 +1,19 @@
 # Changelog — EbonholdAutoLoot
 
+## [1.9] - 2026-04-06
+
+### Changed
+- Blacklist scroll UI simplified: removed Up/Down button controls. Scrolling is now mouse-wheel only. A slim 8px scrollbar track with a proportional amber thumb on the right edge of the list gives a clean visual position indicator — it moves as you scroll but is not clickable. The thumb hides when all items fit without scrolling.
+
+---
+
+## [1.8] - 2026-04-06
+
+### Fixed
+- Blacklist items now display correctly and Remove buttons now work. Root cause: `FauxScrollFrameTemplate` was still broken despite the v1.7 attempt — even with rows parented directly to the scroll frame, the template's internal scroll child movement conflicted with manual row positioning. Replaced entirely with a hand-rolled list: rows are parented directly to `listBg` at fixed offsets, a `g_blacklistOffset` integer tracks the scroll position, and Up/Down buttons plus mouse wheel (`OnMouseWheel`) update the offset and call `EAL_RefreshBlacklist`. No WoW scroll API is used at all.
+
+---
+
 ## [1.7] - 2026-04-06
 
 ### Fixed

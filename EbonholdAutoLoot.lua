@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v1.7
+-- EbonholdAutoLoot  v1.9
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -68,10 +68,11 @@ local waitingForMerchant = false
 -- GUI handles populated by EAL_BuildGUI
 local g_statusLabel
 local g_enableBtn
-local g_blacklistRows = {}
-local g_scrollFrame
-local ROW_HEIGHT      = 22
-local MAX_ROWS        = 8
+local g_blacklistRows   = {}
+local g_blacklistOffset = 0   -- hand-rolled scroll offset (no FauxScrollFrame)
+local g_scrollThumb               -- visual-only scrollbar thumb
+local ROW_HEIGHT        = 22
+local MAX_ROWS          = 8
 
 -------------------------------------------------------------------------------
 -- 1. TIMER HELPER  (C_Timer does not exist in 3.3.5a)
@@ -200,18 +201,18 @@ local function EAL_UpdateStatus()
 end
 
 local function EAL_RefreshBlacklist()
-    if not g_scrollFrame then return end
-    local total  = #EAL_DB.blacklist
-    FauxScrollFrame_Update(g_scrollFrame, total, MAX_ROWS, ROW_HEIGHT)
-    local offset = FauxScrollFrame_GetOffset(g_scrollFrame) or 0
+    if not EAL_DB then return end
+    local total = #EAL_DB.blacklist
+    -- clamp offset so it never points past the list
+    g_blacklistOffset = math.max(0, math.min(g_blacklistOffset,
+                                              math.max(0, total - MAX_ROWS)))
 
     for i = 1, MAX_ROWS do
         local row = g_blacklistRows[i]
-        local idx = offset + i
         if row then
+            local idx = g_blacklistOffset + i
             if idx <= total then
-                local itemName = EAL_DB.blacklist[idx]
-                row.label:SetText(itemName)
+                row.label:SetText(EAL_DB.blacklist[idx])
                 local capturedIdx = idx
                 row.removeBtn:SetScript("OnClick", function()
                     table.remove(EAL_DB.blacklist, capturedIdx)
@@ -221,6 +222,21 @@ local function EAL_RefreshBlacklist()
             else
                 row:Hide()
             end
+        end
+    end
+
+    -- reposition the visual scrollbar thumb
+    if g_scrollThumb then
+        local trackH = MAX_ROWS * ROW_HEIGHT
+        if total <= MAX_ROWS then
+            g_scrollThumb:Hide()
+        else
+            local thumbH = math.max(16, trackH * MAX_ROWS / total)
+            local maxOff = total - MAX_ROWS
+            local thumbY = -(g_blacklistOffset / maxOff) * (trackH - thumbH)
+            g_scrollThumb:SetHeight(thumbH)
+            g_scrollThumb:SetPoint("TOP", 0, thumbY)
+            g_scrollThumb:Show()
         end
     end
 end
@@ -547,8 +563,9 @@ local function EAL_BuildGUI()
     addBtn:SetScript("OnClick", AddBlacklistEntry)
 
     -- ----------------------------------------------------------------
-    -- Scrollable blacklist
+    -- Scrollable blacklist  (hand-rolled, mouse-wheel scroll)
     -- ----------------------------------------------------------------
+    local TRACK_W = 8   -- width of the slim scrollbar track on the right
     local listBg = CreateFrame("Frame", nil, win)
     listBg:SetPoint("TOPLEFT", 14, -256)
     listBg:SetWidth(312); listBg:SetHeight(MAX_ROWS * ROW_HEIGHT + 8)
@@ -560,21 +577,20 @@ local function EAL_BuildGUI()
     })
     listBg:SetBackdropColor(0, 0, 0, 0.85)
 
-    -- FauxScrollFrame manages row visibility manually via an offset value.
-    -- Rows must be parented directly to the scroll frame — NOT to a SetScrollChild
-    -- frame — otherwise the ScrollFrame widget physically moves the container,
-    -- fighting the FauxScrollFrame offset logic and preventing rows from appearing.
-    local scrollFrame = CreateFrame("ScrollFrame", "EAL_ScrollFrame", listBg,
-        "FauxScrollFrameTemplate")
-    scrollFrame:SetPoint("TOPLEFT", 4, -4)
-    scrollFrame:SetWidth(292); scrollFrame:SetHeight(MAX_ROWS * ROW_HEIGHT)
-    scrollFrame.offset = 0   -- initialise so FauxScrollFrame_GetOffset never returns nil
-    g_scrollFrame = scrollFrame
+    -- Mouse wheel scrolls the list
+    listBg:EnableMouseWheel(true)
+    listBg:SetScript("OnMouseWheel", function(self, delta)
+        g_blacklistOffset = g_blacklistOffset - delta
+        EAL_RefreshBlacklist()
+    end)
+
+    -- Row width: full inner width minus the scrollbar track
+    local rowW = 312 - 8 - TRACK_W   -- 296px
 
     for i = 1, MAX_ROWS do
-        local row = CreateFrame("Frame", nil, scrollFrame)
-        row:SetWidth(292); row:SetHeight(ROW_HEIGHT)
-        row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_HEIGHT)
+        local row = CreateFrame("Frame", nil, listBg)
+        row:SetWidth(rowW); row:SetHeight(ROW_HEIGHT)
+        row:SetPoint("TOPLEFT", 4, -4 - (i - 1) * ROW_HEIGHT)
 
         local rowBg = row:CreateTexture(nil, "BACKGROUND")
         rowBg:SetAllPoints()
@@ -586,12 +602,12 @@ local function EAL_BuildGUI()
 
         local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("LEFT", 6, 0)
-        lbl:SetWidth(224)
+        lbl:SetWidth(rowW - 66)
         lbl:SetJustifyH("LEFT")
         lbl:SetWordWrap(false)
 
         local removeBtn = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
-        removeBtn:SetPoint("RIGHT", -4, 0)
+        removeBtn:SetPoint("RIGHT", -2, 0)
         removeBtn:SetWidth(54); removeBtn:SetHeight(18)
         removeBtn:SetText("Remove")
         removeBtn:GetNormalFontObject():SetTextColor(1, 0.4, 0.4)
@@ -602,9 +618,22 @@ local function EAL_BuildGUI()
         g_blacklistRows[i] = row
     end
 
-    scrollFrame:SetScript("OnVerticalScroll", function(self, offset)
-        FauxScrollFrame_OnVerticalScroll(self, offset, ROW_HEIGHT, EAL_RefreshBlacklist)
-    end)
+    -- Slim scrollbar: dark track + lighter thumb (visual only, no buttons)
+    local trackH = MAX_ROWS * ROW_HEIGHT
+    local track = CreateFrame("Frame", nil, listBg)
+    track:SetWidth(TRACK_W); track:SetHeight(trackH)
+    track:SetPoint("TOPRIGHT", -4, -4)
+
+    local trackTex = track:CreateTexture(nil, "BACKGROUND")
+    trackTex:SetAllPoints()
+    trackTex:SetTexture(0.08, 0.08, 0.08, 0.9)
+
+    local thumb = track:CreateTexture(nil, "ARTWORK")
+    thumb:SetWidth(TRACK_W - 2)
+    thumb:SetPoint("TOP", track, "TOP", 0, 0)
+    thumb:SetTexture(0.55, 0.45, 0.25, 0.9)
+    thumb:Hide()
+    g_scrollThumb = thumb
 
     -- ----------------------------------------------------------------
     -- Bottom hint
@@ -654,7 +683,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         gui = EAL_BuildGUI()
-        Print("v1.7 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v1.9 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
