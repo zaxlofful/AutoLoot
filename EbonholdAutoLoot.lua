@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v1.3
+-- EbonholdAutoLoot  v1.4
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -471,9 +471,7 @@ local function EAL_BuildGUI()
 
     local closeBtn = CreateFrame("Button", nil, win, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -4, -4)
-    closeBtn:SetScript("OnClick", function()
-        if not InCombatLockdown() then win:Hide() end
-    end)
+    closeBtn:SetScript("OnClick", function() win:Hide() end)
 
     -- ----------------------------------------------------------------
     -- Status row
@@ -710,7 +708,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         gui = EAL_BuildGUI()
-        Print("v1.3 loaded.  |cffffff00/eal|r to open  |  |cffffff00/eal macro|r to create action-bar macro.")
+        Print("v1.4 loaded.  |cffffff00/eal|r to open  |  |cffffff00/eal macro|r to create action-bar macro.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
@@ -751,10 +749,6 @@ SlashCmdList["EBAUTOLOOT"] = function(msg)
         DismissPet()
         SetState(S_IDLE)
     else
-        if InCombatLockdown() then
-            Print("Cannot open the settings window during combat.", 1, 0.5, 0.5)
-            return
-        end
         if gui:IsShown() then
             gui:Hide()
         else

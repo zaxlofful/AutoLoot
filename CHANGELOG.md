@@ -1,5 +1,12 @@
 # Changelog — EbonholdAutoLoot
 
+## [1.4] - 2026-04-06
+
+### Fixed
+- `/eal` and the window close button now work during combat. The `InCombatLockdown()` guards added in v1.3 were overly conservative — they are only required when a frame contains `SecureActionButtonTemplate` children, which was removed in v1.3. Plain frames with regular buttons and checkboxes can be shown and hidden freely at any time.
+
+---
+
 ## [1.3] - 2026-04-06
 
 ### Fixed
