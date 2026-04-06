@@ -1,5 +1,18 @@
 # Changelog — EbonholdAutoLoot
 
+## [1.2] - 2026-04-06
+
+### Added
+- Companion stuck detection: every bag-check tick, if the Greedy Scavenger is more than 5 yards from the player it is dismissed and re-summoned automatically.
+- `IsPlayerMountedOrFlying()` — stuck detection is suppressed while the player is on a mount or airborne so the pet is not needlessly bounced during travel.
+- `GetCompanionDistance()` — uses `UnitPosition("player")` and `UnitPosition("pet")` for a 2-D yard distance; returns `nil` gracefully if position data is unavailable.
+
+### Changed
+- Stuck check shares the existing `bagCheckTimer` interval (default 3 s) with no additional `OnUpdate` overhead.
+- Stuck check is skipped on the same tick that triggers a sell cycle to prevent a dismiss colliding with the sell-cycle dismiss.
+
+---
+
 ## [1.1] - 2026-04-06
 
 ### Added

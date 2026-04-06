@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v1.1
+-- EbonholdAutoLoot  v1.2
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -40,6 +40,9 @@ local QUALITY_HEX   = { [0]="9d9d9d", [1]="ffffff", [2]="1eff00", [3]="0070dd", 
 local S_IDLE    = "IDLE"
 local S_LOOTING = "LOOTING"
 local S_SELLING = "SELLING"
+
+-- Companion stuck detection
+local MAX_COMPANION_DISTANCE = 5   -- yards; resummon if pet exceeds this from player
 
 -- Macro that players can place on their action bar for quick in-combat targeting.
 -- InteractUnit is Blizzard-UI-only and cannot be called from any macro or addon
@@ -159,6 +162,27 @@ end
 
 local function DismissPet()
     DismissCompanion("CRITTER")
+end
+
+-- Returns true when the player should not be disturbed by a resummon
+-- (airborne or on a ground/flying mount).  Both functions are guarded in
+-- case a particular emulator build doesn't expose them.
+local function IsPlayerMountedOrFlying()
+    if IsFlying  and IsFlying()  then return true end
+    if IsMounted and IsMounted() then return true end
+    return false
+end
+
+-- Returns the 2-D distance in yards between the player and the summoned
+-- companion critter.  Companion critters occupy the "pet" unit token when
+-- the player has no active combat pet.  Returns nil if either position is
+-- unavailable (unit doesn't exist, UnitPosition not supported, etc.).
+local function GetCompanionDistance()
+    local px, py = UnitPosition("player")
+    local cx, cy = UnitPosition("pet")
+    if not px or not cx then return nil end
+    local dx, dy = px - cx, py - cy
+    return math.sqrt(dx * dx + dy * dy)
 end
 
 -------------------------------------------------------------------------------
@@ -353,17 +377,40 @@ local function OnMerchantClosed()
     end
 end
 
+-- Dismisses and re-summons the Greedy Scavenger if it has drifted more than
+-- MAX_COMPANION_DISTANCE yards from the player.  Skipped when the player is
+-- mounted or flying so the pet isn't needlessly bounced during travel.
+local function CheckCompanionStuck()
+    if IsPlayerMountedOrFlying() then return end
+
+    local dist = GetCompanionDistance()
+    if dist == nil then return end   -- position data not available; skip silently
+
+    if dist > MAX_COMPANION_DISTANCE then
+        Print("Greedy Scavenger is stuck (" .. math.floor(dist) ..
+              " yds away) — resummoning...", 1, 0.75, 0.2)
+        DismissPet()
+        After(0.5, function()
+            SummonPet(LOOT_PET_NAME)
+        end)
+    end
+end
+
 -- Per-frame bag check + button pulse while looting / selling
 local function OnUpdate(self, elapsed)
     if not EAL_DB then return end
 
-    -- Bag check
+    -- Bag check + companion stuck detection (share the same interval timer)
     if EAL_DB.enabled and currentState == S_LOOTING then
         bagCheckTimer = bagCheckTimer + elapsed
         if bagCheckTimer >= (EAL_DB.checkInterval or 3) then
             bagCheckTimer = 0
             if GetTotalFreeSlots() == 0 then
                 StartSellCycle()
+            else
+                -- Only run stuck check when we're not already switching to sell;
+                -- avoids a dismiss colliding with the sell-cycle dismiss.
+                CheckCompanionStuck()
             end
         end
     end
