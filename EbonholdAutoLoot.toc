@@ -1,0 +1,9 @@
+## Interface: 30300
+## Title: Ebonhold AutoLoot
+## Notes: Auto-loots with Greedy Scavenger, auto-sells with Goblin Merchant. /eal to open.
+## Author: Ebonhold
+## Version: 1.1
+## Dependencies: ProjectEbonhold
+## SavedVariables: EAL_SavedDB
+
+EbonholdAutoLoot.lua
