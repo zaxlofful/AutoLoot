@@ -1,5 +1,12 @@
 # Changelog — EbonholdAutoLoot
 
+## [1.6] - 2026-04-06
+
+### Added
+- Auto-repair on merchant open: calls `RepairAllItems()` before selling whenever `CanMerchantRepair()` returns true. Repair runs first so durability is restored regardless of whether the sell step finds anything. Prints "All items repaired." to chat when triggered.
+
+---
+
 ## [1.5] - 2026-04-06
 
 ### Removed

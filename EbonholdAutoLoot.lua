@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v1.5
+-- EbonholdAutoLoot  v1.6
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -318,6 +318,12 @@ local function OnMerchantShow()
     waitingForMerchant = false
     if currentState == S_SELLING or EAL_DB.enabled then
         After(0.3, function()
+            -- Repair before selling so durability is restored even if the
+            -- sell step errors or finds nothing to sell.
+            if CanMerchantRepair() then
+                RepairAllItems()
+                Print("All items repaired.")
+            end
             SellItems()
             EAL_UpdateStatus()
         end)
@@ -647,7 +653,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         gui = EAL_BuildGUI()
-        Print("v1.5 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v1.6 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
