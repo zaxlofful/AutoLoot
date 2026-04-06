@@ -1,5 +1,17 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.5] - 2026-04-06
+
+### Changed
+- `SellItems()` now sells in batches of up to 80 items while the vendor window stays open. After each full batch it waits **0.5 seconds** then automatically sells the next batch, repeating until all qualifying items are gone. Totals are accumulated across batches and a single summary line is printed at the end. This prevents a flood of `UseContainerItem` calls in one frame tick that could disconnect low-end clients, without requiring the player to reopen the vendor.
+
+## [2.4] - 2026-04-06
+
+### Changed
+- `SellItems()` now caps at **80 `UseContainerItem` calls per pulse** via `MAX_SELL_PER_PULSE = 80`. Once the cap is hit the inner and outer bag loops break immediately, preventing a flood of sell packets in a single `MERCHANT_SHOW` callback that could disconnect low-end clients. A chat notice is printed when the cap is reached, reminding the player to reopen the vendor to sell the remaining items.
+
+---
+
 ## [2.3] - 2026-04-06
 
 ### Added

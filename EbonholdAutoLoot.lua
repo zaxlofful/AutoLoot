@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v2.3
+-- EbonholdAutoLoot  v2.5
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -42,6 +42,12 @@ local S_SELLING = "SELLING"
 
 -- Companion stuck detection
 local MAX_COMPANION_DISTANCE = 5   -- yards; resummon if pet exceeds this from player
+
+-- Per-pulse sell cap: avoids flooding the server with too many UseContainerItem
+-- calls in a single MERCHANT_SHOW callback, which can cause low-end clients to
+-- disconnect.  If more items remain after the cap is hit, open the vendor again
+-- to sell the next batch.
+local MAX_SELL_PER_PULSE = 80
 
 -- SavedVariables schema / defaults
 local DEFAULTS = {
@@ -250,11 +256,16 @@ end
 -------------------------------------------------------------------------------
 -- 5. SELLING LOGIC
 -------------------------------------------------------------------------------
-local function SellItems()
-    local sold    = 0
+-- totalSold / totalSkipped accumulate across batches within a single vendor session.
+local function SellItems(totalSold, totalSkipped)
+    totalSold    = totalSold    or 0
+    totalSkipped = totalSkipped or 0
+    local sold   = 0
     local skipped = 0
+    local capped  = false
 
     for bag = 0, 4 do
+        if capped then break end
         local numSlots = GetContainerNumSlots(bag)
         for slot = 1, numSlots do
             local link = GetContainerItemLink(bag, slot)
@@ -276,20 +287,35 @@ local function SellItems()
                     if sell then
                         UseContainerItem(bag, slot)
                         sold = sold + 1
+                        if sold >= MAX_SELL_PER_PULSE then
+                            capped = true
+                            break
+                        end
                     end
                 end
             end
         end
     end
 
-    if sold > 0 or skipped > 0 then
-        Print("Sold |cffffff00" .. sold ..
-              "|r item(s). Blacklist protected: |cffffff00" .. skipped .. "|r.")
-    else
-        Print("Nothing to sell with current quality settings.")
-    end
+    totalSold    = totalSold    + sold
+    totalSkipped = totalSkipped + skipped
 
-    return sold
+    -- If we hit the cap and the vendor window is still open, wait 0.5 s then
+    -- sell the next batch.  Sold items are gone from the bags so re-scanning
+    -- from bag 0 naturally picks up the remainder.
+    if capped and MerchantFrame:IsShown() then
+        After(0.5, function()
+            SellItems(totalSold, totalSkipped)
+        end)
+    else
+        if totalSold > 0 or totalSkipped > 0 then
+            Print("Sold |cffffff00" .. totalSold ..
+                  "|r item(s). Blacklist protected: |cffffff00" .. totalSkipped .. "|r.")
+        else
+            Print("Nothing to sell with current quality settings.")
+        end
+        EAL_UpdateStatus()
+    end
 end
 
 -------------------------------------------------------------------------------
@@ -347,7 +373,6 @@ local function OnMerchantShow()
                 Print("All items repaired.")
             end
             SellItems()
-            EAL_UpdateStatus()
         end)
     end
 end
@@ -821,7 +846,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         gui       = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
-        Print("v2.3 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v2.5 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
