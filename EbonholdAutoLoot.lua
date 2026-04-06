@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v1.6
+-- EbonholdAutoLoot  v1.7
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -203,7 +203,7 @@ local function EAL_RefreshBlacklist()
     if not g_scrollFrame then return end
     local total  = #EAL_DB.blacklist
     FauxScrollFrame_Update(g_scrollFrame, total, MAX_ROWS, ROW_HEIGHT)
-    local offset = FauxScrollFrame_GetOffset(g_scrollFrame)
+    local offset = FauxScrollFrame_GetOffset(g_scrollFrame) or 0
 
     for i = 1, MAX_ROWS do
         local row = g_blacklistRows[i]
@@ -560,18 +560,19 @@ local function EAL_BuildGUI()
     })
     listBg:SetBackdropColor(0, 0, 0, 0.85)
 
+    -- FauxScrollFrame manages row visibility manually via an offset value.
+    -- Rows must be parented directly to the scroll frame — NOT to a SetScrollChild
+    -- frame — otherwise the ScrollFrame widget physically moves the container,
+    -- fighting the FauxScrollFrame offset logic and preventing rows from appearing.
     local scrollFrame = CreateFrame("ScrollFrame", "EAL_ScrollFrame", listBg,
         "FauxScrollFrameTemplate")
     scrollFrame:SetPoint("TOPLEFT", 4, -4)
     scrollFrame:SetWidth(292); scrollFrame:SetHeight(MAX_ROWS * ROW_HEIGHT)
+    scrollFrame.offset = 0   -- initialise so FauxScrollFrame_GetOffset never returns nil
     g_scrollFrame = scrollFrame
 
-    local listContainer = CreateFrame("Frame", nil, scrollFrame)
-    listContainer:SetWidth(292); listContainer:SetHeight(MAX_ROWS * ROW_HEIGHT)
-    scrollFrame:SetScrollChild(listContainer)
-
     for i = 1, MAX_ROWS do
-        local row = CreateFrame("Frame", nil, listContainer)
+        local row = CreateFrame("Frame", nil, scrollFrame)
         row:SetWidth(292); row:SetHeight(ROW_HEIGHT)
         row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_HEIGHT)
 
@@ -653,7 +654,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         gui = EAL_BuildGUI()
-        Print("v1.6 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v1.7 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()

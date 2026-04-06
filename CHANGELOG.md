@@ -1,5 +1,13 @@
 # Changelog — EbonholdAutoLoot
 
+## [1.7] - 2026-04-06
+
+### Fixed
+- Blacklist items now appear in the scroll panel after being added. Root cause: rows were parented to a `listContainer` frame that was set as the `ScrollFrame`'s scroll child. `FauxScrollFrameTemplate` manages row visibility manually via a logical offset and is not designed to work with a scroll child — the ScrollFrame widget was physically moving `listContainer` (and its children) on every scroll event, fighting the FauxScrollFrame offset logic and preventing rows from rendering in the correct positions. Fixed by removing `listContainer` and `SetScrollChild` entirely; rows are now parented directly to the scroll frame, which is the standard FauxScrollFrame pattern.
+- Added `scrollFrame.offset = 0` initialisation and `or 0` fallback in `EAL_RefreshBlacklist` so `FauxScrollFrame_GetOffset` never returns nil on first paint.
+
+---
+
 ## [1.6] - 2026-04-06
 
 ### Added
