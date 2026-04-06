@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v1.9
+-- EbonholdAutoLoot  v2.0
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -399,7 +399,39 @@ local function OnUpdate(self, elapsed)
 end
 
 -------------------------------------------------------------------------------
--- 7. GUI
+-- 7. VENDOR MACRO
+-------------------------------------------------------------------------------
+local VENDOR_MACRO_NAME = "EAL Merchant"
+local VENDOR_MACRO_ICON = "INV_Misc_Coin_02"
+local VENDOR_MACRO_BODY = "/targetexact Goblin Merchant"
+
+-- Creates (or refreshes) a general macro named "EAL Merchant" that targets
+-- the Goblin Merchant companion NPC.  Must be called outside combat.
+-- Returns true on success, false if the macro book is full.
+local function EAL_CreateVendorMacro()
+    if InCombatLockdown() then
+        Print("|cffff4444Cannot create macro during combat.|r Log out and back in, or click |cffffff00Create Macro|r while out of combat.")
+        return false
+    end
+
+    local existing = GetMacroInfo(VENDOR_MACRO_NAME)
+    if existing then
+        EditMacro(VENDOR_MACRO_NAME, VENDOR_MACRO_NAME, VENDOR_MACRO_ICON, VENDOR_MACRO_BODY, false)
+        Print("|cffffff00EAL Merchant|r macro updated. Drag it from your Macro book to an action bar.")
+    else
+        local numGlobal = GetNumMacros()
+        if numGlobal >= 120 then
+            Print("|cffff4444Macro book is full (120/120).|r Delete a macro then try again.")
+            return false
+        end
+        CreateMacro(VENDOR_MACRO_NAME, VENDOR_MACRO_ICON, VENDOR_MACRO_BODY, false)
+        Print("|cffffff00EAL Merchant|r macro created! Open your |cffffff00Macro book (G)|r, find |cffffff00EAL Merchant|r, and drag it to an action bar.")
+    end
+    return true
+end
+
+-------------------------------------------------------------------------------
+-- 8. GUI
 -------------------------------------------------------------------------------
 local function MakeHeader(parent, text, x, y)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -437,7 +469,7 @@ local function EAL_BuildGUI()
     -- Main window  (550 tall to accommodate the extra vendor row)
     -- ----------------------------------------------------------------
     local win = CreateFrame("Frame", "EAL_Window", UIParent)
-    win:SetWidth(340); win:SetHeight(460)
+    win:SetWidth(340); win:SetHeight(496)
     win:SetPoint("TOPLEFT", UIParent, "TOPLEFT", EAL_DB.windowX, EAL_DB.windowY)
     win:SetFrameStrata("HIGH")
     win:SetMovable(true)
@@ -504,17 +536,34 @@ local function EAL_BuildGUI()
     sellNowBtn:SetScript("OnClick", function() StartSellCycle() end)
 
     -- ----------------------------------------------------------------
-    -- Quality sell toggles
+    -- Vendor macro row
     -- ----------------------------------------------------------------
     MakeDivider(win, -114)
-    MakeHeader(win, "SELL QUALITY", 18, -124)
+
+    local macroHint = win:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    macroHint:SetPoint("TOPLEFT", 18, -126)
+    macroHint:SetWidth(210)
+    macroHint:SetJustifyH("LEFT")
+    macroHint:SetText("|cffaaaaааTarget the Goblin Merchant during combat:|r")
+
+    local macroBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
+    macroBtn:SetPoint("TOPLEFT", 232, -122)
+    macroBtn:SetWidth(90); macroBtn:SetHeight(22)
+    macroBtn:SetText("Create Macro")
+    macroBtn:SetScript("OnClick", function() EAL_CreateVendorMacro() end)
+
+    -- ----------------------------------------------------------------
+    -- Quality sell toggles
+    -- ----------------------------------------------------------------
+    MakeDivider(win, -150)
+    MakeHeader(win, "SELL QUALITY", 18, -160)
 
     local qualityDefs = {
-        { Q_GREY,     "sellGrey",      18,  -144 },
-        { Q_WHITE,    "sellWhite",    110,  -144 },
-        { Q_UNCOMMON, "sellUncommon", 210,  -144 },
-        { Q_RARE,     "sellRare",      18,  -168 },
-        { Q_EPIC,     "sellEpic",     110,  -168 },
+        { Q_GREY,     "sellGrey",      18,  -180 },
+        { Q_WHITE,    "sellWhite",    110,  -180 },
+        { Q_UNCOMMON, "sellUncommon", 210,  -180 },
+        { Q_RARE,     "sellRare",      18,  -204 },
+        { Q_EPIC,     "sellEpic",     110,  -204 },
     }
 
     for _, def in ipairs(qualityDefs) do
@@ -528,11 +577,11 @@ local function EAL_BuildGUI()
     -- ----------------------------------------------------------------
     -- Blacklist section
     -- ----------------------------------------------------------------
-    MakeDivider(win, -198)
-    MakeHeader(win, "ITEM BLACKLIST  (these items are never sold)", 18, -208)
+    MakeDivider(win, -234)
+    MakeHeader(win, "ITEM BLACKLIST  (these items are never sold)", 18, -244)
 
     local inputBox = CreateFrame("EditBox", "EAL_BlacklistInput", win, "InputBoxTemplate")
-    inputBox:SetPoint("TOPLEFT", 18, -230)
+    inputBox:SetPoint("TOPLEFT", 18, -266)
     inputBox:SetWidth(224); inputBox:SetHeight(20)
     inputBox:SetAutoFocus(false)
     inputBox:SetMaxLetters(64)
@@ -557,7 +606,7 @@ local function EAL_BuildGUI()
     end)
 
     local addBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
-    addBtn:SetPoint("TOPLEFT", 250, -228)
+    addBtn:SetPoint("TOPLEFT", 250, -264)
     addBtn:SetWidth(72); addBtn:SetHeight(22)
     addBtn:SetText("Add")
     addBtn:SetScript("OnClick", AddBlacklistEntry)
@@ -567,7 +616,7 @@ local function EAL_BuildGUI()
     -- ----------------------------------------------------------------
     local TRACK_W = 8   -- width of the slim scrollbar track on the right
     local listBg = CreateFrame("Frame", nil, win)
-    listBg:SetPoint("TOPLEFT", 14, -256)
+    listBg:SetPoint("TOPLEFT", 14, -292)
     listBg:SetWidth(312); listBg:SetHeight(MAX_ROWS * ROW_HEIGHT + 8)
     listBg:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -683,7 +732,8 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         gui = EAL_BuildGUI()
-        Print("v1.9 loaded.  |cffffff00/eal|r to open settings.")
+        EAL_CreateVendorMacro()   -- auto-create at login (always outside combat)
+        Print("v2.0 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()

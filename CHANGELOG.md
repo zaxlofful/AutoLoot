@@ -1,5 +1,15 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.0] - 2026-04-06
+
+### Added
+- **Vendor macro** (`EAL Merchant`): automatically created in your general Macro book every time you log in. The macro runs `/targetexact Goblin Merchant`, letting you target the vendor companion during combat. Once targeted, use your **Interact with Target** keybind or right-click the NPC to open the vendor window and trigger the auto-sell. A **"Create Macro"** button in the GUI lets you recreate or refresh it at any time while out of combat.
+
+### Changed
+- Window height expanded to 496px to accommodate the new vendor macro row between the Enable/Force Sell buttons and the quality toggles.
+
+---
+
 ## [1.9] - 2026-04-06
 
 ### Changed
