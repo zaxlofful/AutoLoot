@@ -1,5 +1,13 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.3] - 2026-04-06
+
+### Added
+- **Mount-aware companion management**: `OnUpdate` now tracks `IsPlayerMountedOrFlying()` across frames. On mount → dismisses whichever companion is currently out. On dismount → re-summons the correct companion after a 1.5s delay (engine requires a brief pause before `CallCompanion` is accepted after dismounting): Greedy Scavenger if in `S_LOOTING`, Goblin Merchant if in `S_SELLING`. No re-summon occurs if the addon is disabled or in `S_IDLE`.
+- Bag check and stuck detection are skipped while mounted to avoid interfering with the dismount re-summon flow.
+
+---
+
 ## [2.2] - 2026-04-06
 
 ### Added

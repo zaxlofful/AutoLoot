@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v2.2
+-- EbonholdAutoLoot  v2.3
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -67,6 +67,7 @@ local EAL_DB             -- assigned from SavedVariables on ADDON_LOADED
 local currentState       = S_IDLE
 local bagCheckTimer      = 0
 local waitingForMerchant = false
+local wasMounted         = false  -- previous-frame mount state for change detection
 
 -- GUI handles populated by EAL_BuildGUI
 local g_statusLabel
@@ -382,12 +383,39 @@ local function CheckCompanionStuck()
     end
 end
 
--- Per-frame bag check + button pulse while looting / selling
+-- Per-frame bag check + mount detection
 local function OnUpdate(self, elapsed)
     if not EAL_DB then return end
 
-    -- Bag check + companion stuck detection (share the same interval timer)
-    if EAL_DB.enabled and currentState == S_LOOTING then
+    -- ── Mount state change detection ────────────────────────────────────────
+    local nowMounted = IsPlayerMountedOrFlying()
+    if nowMounted ~= wasMounted then
+        wasMounted = nowMounted
+
+        if nowMounted then
+            -- Just mounted: dismiss whichever companion is currently out
+            DismissPet()
+            if currentState ~= S_IDLE then
+                Print("Mounted — companion dismissed.")
+            end
+        else
+            -- Just dismounted: re-summon the correct companion after a short
+            -- delay (engine needs a moment before CallCompanion is accepted)
+            if EAL_DB.enabled then
+                if currentState == S_LOOTING then
+                    Print("Dismounted — re-summoning " .. LOOT_PET_NAME .. "...")
+                    After(1.5, function() SummonPet(LOOT_PET_NAME) end)
+                elseif currentState == S_SELLING then
+                    Print("Dismounted — re-summoning " .. VENDOR_PET_NAME .. "...")
+                    waitingForMerchant = true
+                    After(1.5, function() SummonPet(VENDOR_PET_NAME) end)
+                end
+            end
+        end
+    end
+
+    -- ── Bag check + companion stuck detection ───────────────────────────────
+    if EAL_DB.enabled and currentState == S_LOOTING and not nowMounted then
         bagCheckTimer = bagCheckTimer + elapsed
         if bagCheckTimer >= (EAL_DB.checkInterval or 3) then
             bagCheckTimer = 0
@@ -793,7 +821,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         gui       = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
-        Print("v2.2 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v2.3 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
