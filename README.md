@@ -6,12 +6,12 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 
 ## Features
 
-- **Auto-loot cycle** — Summons the Greedy Scavenger and monitors your bags. When every slot is full it automatically dismisses the Scavenger and summons the Goblin Merchant.
-- **Auto-sell on merchant open** — The moment any vendor window opens, the addon scans your bags and sells all qualifying items instantly.
+- **Auto-loot cycle** — Summons the Greedy Scavenger and monitors your bags every 3 seconds. When every slot is full it automatically dismisses the Scavenger and summons the Goblin Merchant.
+- **Auto-repair** — Calls `RepairAllItems()` the moment a merchant window opens, before selling, so durability is always restored first.
+- **Auto-sell on merchant open** — Scans your bags and sells all qualifying items the instant any vendor window opens.
 - **Per-quality sell toggles** — Choose exactly which quality tiers to sell: Grey, White, Uncommon, Rare, and/or Epic.
 - **Item blacklist** — Add item names to a protected list; blacklisted items are never sold regardless of quality.
-- **In-combat vendor support** — A `SecureActionButtonTemplate` button targets the Goblin Merchant as a hardware event (works during combat lockdown). Pair it with your **Interact with Target** keybind to open the vendor mid-fight.
-- **Action-bar macro generator** — One click (or `/eal macro`) creates a ready-to-drag `EBVendor` macro in your macro book.
+- **Companion stuck detection** — Every bag-check tick, if the Greedy Scavenger drifts more than 5 yards from the player it is automatically dismissed and re-summoned. Skipped while mounted or airborne.
 - **Persistent settings** — All preferences saved between sessions via `SavedVariables`.
 
 ---
@@ -35,30 +35,29 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 
 | Command | Action |
 |---|---|
-| `/eal` | Open / close the settings window |
+| `/eal` | Open / close the settings window (works in and out of combat) |
 | `/eal enable` | Enable the loot+sell cycle |
 | `/eal disable` | Disable and dismiss any active pet |
-| `/eal macro` | Create / update the `EBVendor` action-bar macro |
 | `/eal reset` | Clear the entire blacklist |
 | `/autoloot` | Alias for `/eal` |
 
 ### Basic workflow
 
 1. Open the settings window with `/eal`.
-2. Tick the quality tiers you want to sell (Grey is enabled by default).
+2. Tick the quality tiers you want to sell (Grey is on by default).
 3. Add any items you want to keep to the **Blacklist**.
 4. Click **Enable** — the addon summons your Greedy Scavenger and starts monitoring your bags.
-5. When bags fill up, it automatically switches to the Goblin Merchant. Open the vendor window and selling happens instantly.
+5. When bags fill up, it automatically dismisses the Scavenger and summons the Goblin Merchant.
+6. Interact with the Goblin Merchant to open the vendor window — the addon immediately repairs all gear and sells all qualifying items.
+7. Once the vendor window closes, the Greedy Scavenger is automatically re-summoned and looting resumes.
 
 ### Selling in combat
 
-`InteractUnit` is a Blizzard-UI-only protected function and cannot be called from any addon script or macro, even during a hardware event. The supported in-combat workflow is:
+`InteractUnit` is a Blizzard-UI-only protected function — there is no client-side workaround. The addon summons the Goblin Merchant automatically when bags are full; the player must interact with it to open the vendor window.
 
-1. When bags are full the addon summons the Goblin Merchant automatically.
-2. Click the **Target Vendor** button in the addon window (or press your `EBVendor` macro on your action bar) — this targets the Goblin Merchant as a secure hardware event.
-3. **Right-click** the Goblin Merchant's model in the world, **or** press your **Interact with Target** keybind.
-   - To set the keybind: `Escape → Key Bindings → Targeting → Interact With Target`
-4. The vendor window opens and auto-sell fires immediately.
+**Recommended setup:** bind **Interact with Target** to an easily reachable key (`Escape → Key Bindings → Targeting → Interact With Target`). When the addon notifies you that the merchant is ready, target it and press that key.
+
+> **Server-side note:** The fully seamless automatic flow — no player interaction required at all — can be achieved by configuring the Goblin Merchant companion on the server to send the merchant list to the client on summon (firing `MERCHANT_SHOW` server-side). Once that is in place the addon handles the entire cycle without any input.
 
 ---
 
@@ -72,11 +71,8 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 ├─────────────────────────────────────┤
 │ [Enable/Disable]   [Force Sell Now] │
 ├─────────────────────────────────────┤
-│ IN-COMBAT VENDOR                    │
-│ [Target Vendor]     [Create Macro]  │
-├─────────────────────────────────────┤
 │ SELL QUALITY                        │
-│ [x] Grey  [x] White  [ ] Uncommon  │
+│ [x] Grey  [ ] White  [ ] Uncommon  │
 │ [ ] Rare  [ ] Epic                  │
 ├─────────────────────────────────────┤
 │ ITEM BLACKLIST                      │
@@ -94,7 +90,12 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 
 | Version | Notes |
 |---|---|
-| 1.1 | In-combat vendor: SecureAction target button + EBVendor macro generator. Removed unsupported InteractUnit macro call. |
+| 1.6 | Auto-repair: calls `RepairAllItems()` before selling whenever merchant supports it. |
+| 1.5 | Removed macro creation code; documented `InteractUnit` limitation and server-side fix. |
+| 1.4 | Re-enabled `/eal` during combat — plain frames need no `InCombatLockdown` guard. |
+| 1.3 | Removed `SecureActionButtonTemplate` from GUI (caused "Interface action failed" error). |
+| 1.2 | Companion stuck detection: auto-resummon if Greedy Scavenger > 5 yards away while not mounted. |
+| 1.1 | Case-insensitive companion name matching; in-combat vendor attempt with SecureAction button. |
 | 1.0 | Initial release — auto-loot/sell cycle, quality toggles, blacklist GUI. |
 
 ---
