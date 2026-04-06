@@ -8,7 +8,7 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 
 - **Auto-loot cycle** — Summons the Greedy Scavenger and monitors your bags every 3 seconds. When every slot is full it automatically dismisses the Scavenger and summons the Goblin Merchant.
 - **Auto-repair** — Calls `RepairAllItems()` the moment a merchant window opens, before selling, so durability is always restored first.
-- **Auto-sell on merchant open** — Scans your bags and sells all qualifying items the instant any vendor window opens.
+- **Auto-sell on merchant open** — Scans your bags and sells all qualifying items the instant any vendor window opens. Items are sold in batches of up to 80 per pulse with a 0.5-second pause between batches; the vendor window stays open throughout and a single summary prints when the last batch finishes.
 - **Per-quality sell toggles** — Choose exactly which quality tiers to sell: Grey, White, Uncommon, Rare, and/or Epic.
 - **Item blacklist** — Add item names to a protected list; blacklisted items are never sold regardless of quality.
 - **Companion stuck detection** — Every bag-check tick, if the Greedy Scavenger drifts more than 5 yards from the player it is automatically dismissed and re-summoned. Skipped while mounted or airborne.
@@ -48,7 +48,7 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 3. Add any items you want to keep to the **Blacklist**.
 4. Click **Enable** — the addon summons your Greedy Scavenger and starts monitoring your bags.
 5. When bags fill up, it automatically dismisses the Scavenger and summons the Goblin Merchant.
-6. Interact with the Goblin Merchant to open the vendor window — the addon immediately repairs all gear and sells all qualifying items.
+6. Interact with the Goblin Merchant to open the vendor window — the addon immediately repairs all gear, then sells qualifying items in batches of 80 with a 0.5-second pause between each batch. Keep the vendor window open until the summary message appears in chat.
 7. Once the vendor window closes, the Greedy Scavenger is automatically re-summoned and looting resumes.
 
 ### Selling in combat
@@ -90,6 +90,12 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 
 | Version | Notes |
 |---|---|
+| 2.5 | Batched selling: up to 80 items per pulse, 0.5 s delay between batches, vendor stays open, single summary on completion. |
+| 2.4 | Added `MAX_SELL_PER_PULSE = 80` cap to prevent packet flooding on low-end clients. |
+| 2.3 | Mount-aware companion management: dismiss on mount, re-summon correct pet on dismount. |
+| 2.2 | On-screen vendor button (`SecureActionButtonTemplate`) replaces macro/keybind approach. |
+| 2.1 | Vendor macro reworked to `VendorBind` pattern with automatic F5 keybind. |
+| 2.0 | Vendor macro auto-creation on login. |
 | 1.6 | Auto-repair: calls `RepairAllItems()` before selling whenever merchant supports it. |
 | 1.5 | Removed macro creation code; documented `InteractUnit` limitation and server-side fix. |
 | 1.4 | Re-enabled `/eal` during combat — plain frames need no `InCombatLockdown` guard. |
