@@ -1,5 +1,17 @@
 # Changelog — EbonholdAutoLoot
 
+## [1.5] - 2026-04-06
+
+### Removed
+- `CreateVendorMacro()`, `VENDOR_MACRO_NAME`, `VENDOR_MACRO_BODY` constants, the "Create Macro" GUI button, and the `/eal macro` slash command. `CreateMacro` and `InteractUnit` both require hardware events or non-combat context and could not be made to work reliably.
+- "IN-COMBAT VENDOR" GUI section removed entirely.
+
+### Changed
+- Window height reduced to 460 px; quality toggles and blacklist shifted up to fill the space.
+- Header comment updated to document the hard limitation: `InteractUnit` is Blizzard-UI-only with no client-side workaround. The fully automatic selling path requires the server to fire `MERCHANT_SHOW` automatically when the Goblin Merchant companion is summoned.
+
+---
+
 ## [1.4] - 2026-04-06
 
 ### Fixed

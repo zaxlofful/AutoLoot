@@ -1,25 +1,24 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v1.4
+-- EbonholdAutoLoot  v1.5
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
 --
--- In-combat selling:
---   CallCompanion / InteractUnit are protected functions and cannot be called
---   by addon scripts during combat lockdown.  The addon summons the Goblin
---   Merchant automatically; the player then clicks the "Open Vendor" button
---   (SecureActionButtonTemplate — counts as a hardware event) to open the
---   vendor window in combat.  Auto-sell fires the moment MERCHANT_SHOW fires.
---   Use /eal macro to create a matching action-bar macro.
+-- Selling requires the player to interact with the Goblin Merchant NPC once
+-- it is summoned.  InteractUnit is Blizzard-UI-only and cannot be called from
+-- any addon script or macro — there is no client-side workaround.  The fully
+-- automatic solution requires a server-side change: configure the Goblin
+-- Merchant companion to send the merchant list to the client on summon
+-- (firing MERCHANT_SHOW automatically), which many custom servers support.
+-- Auto-sell fires the instant MERCHANT_SHOW fires regardless of how it opened.
 --
 -- GUI Features:
 --   - Enable / Disable the full loot+sell cycle
---   - "Open Vendor" secure button (works in combat) + "Create Macro" helper
 --   - Per-quality sell toggles: Grey / White / Uncommon / Rare / Epic
 --   - Item blacklist: named items are never sold regardless of quality
 --   - Live status display with free-slot counter
 --
--- Slash commands:  /eal   /autoloot   /eal macro
+-- Slash commands:  /eal   /autoloot
 -------------------------------------------------------------------------------
 
 local ADDON_NAME      = "EbonholdAutoLoot"
@@ -43,14 +42,6 @@ local S_SELLING = "SELLING"
 
 -- Companion stuck detection
 local MAX_COMPANION_DISTANCE = 5   -- yards; resummon if pet exceeds this from player
-
--- Macro that players can place on their action bar for quick in-combat targeting.
--- InteractUnit is Blizzard-UI-only and cannot be called from any macro or addon
--- script.  This macro targets the NPC; the player then opens the vendor by
--- right-clicking the NPC model OR pressing their "Interact with Target" keybind
--- (Key Bindings > Targeting > Interact With Target).
-local VENDOR_MACRO_NAME = "EBVendor"
-local VENDOR_MACRO_BODY = "/targetexact " .. VENDOR_PET_NAME
 
 -- SavedVariables schema / defaults
 local DEFAULTS = {
@@ -183,27 +174,7 @@ local function GetCompanionDistance()
 end
 
 -------------------------------------------------------------------------------
--- 3. VENDOR MACRO HELPER
---    Creates (or updates) an in-game macro the player can drag to their bar.
---    Clicking it from the action bar counts as a hardware event, so
---    InteractUnit fires even during combat lockdown.
--------------------------------------------------------------------------------
-local function CreateVendorMacro()
-    local idx = GetMacroIndexByName(VENDOR_MACRO_NAME)
-    if idx and idx > 0 then
-        EditMacro(idx, VENDOR_MACRO_NAME, nil, VENDOR_MACRO_BODY, nil)
-        Print("|cffffff00" .. VENDOR_MACRO_NAME ..
-              "|r macro updated. Drag it from your macro book to your action bar.")
-    else
-        -- Icon: use the gold coin bag icon (available in all WotLK clients)
-        CreateMacro(VENDOR_MACRO_NAME, "INV_Misc_Bag_10_Green", VENDOR_MACRO_BODY, nil)
-        Print("|cffffff00" .. VENDOR_MACRO_NAME ..
-              "|r macro created! Open your macro book (/macro) and drag it to your action bar.")
-    end
-end
-
--------------------------------------------------------------------------------
--- 4. STATUS / GUI REFRESH
+-- 3. STATUS / GUI REFRESH
 -------------------------------------------------------------------------------
 local function EAL_UpdateStatus()
     if not g_statusLabel then return end
@@ -444,7 +415,7 @@ local function EAL_BuildGUI()
     -- Main window  (550 tall to accommodate the extra vendor row)
     -- ----------------------------------------------------------------
     local win = CreateFrame("Frame", "EAL_Window", UIParent)
-    win:SetWidth(340); win:SetHeight(510)
+    win:SetWidth(340); win:SetHeight(460)
     win:SetPoint("TOPLEFT", UIParent, "TOPLEFT", EAL_DB.windowX, EAL_DB.windowY)
     win:SetFrameStrata("HIGH")
     win:SetMovable(true)
@@ -511,49 +482,17 @@ local function EAL_BuildGUI()
     sellNowBtn:SetScript("OnClick", function() StartSellCycle() end)
 
     -- ----------------------------------------------------------------
-    -- Row 2: In-combat vendor — macro button + instruction text
-    -- SecureActionButtonTemplate cannot be parented to a regular addon
-    -- frame; doing so blocks Show/Hide on the parent window.  The correct
-    -- in-combat approach is an action-bar macro (hardware event on click).
-    -- ----------------------------------------------------------------
-    MakeDivider(win, -114)
-    MakeHeader(win, "IN-COMBAT VENDOR", 18, -124)
-
-    local macroBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
-    macroBtn:SetPoint("TOPLEFT", 18, -140)
-    macroBtn:SetWidth(140); macroBtn:SetHeight(26)
-    macroBtn:SetText("Create Macro")
-    macroBtn:SetScript("OnClick", function() CreateVendorMacro() end)
-    macroBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("|cffffd700Create |cffffff00" .. VENDOR_MACRO_NAME .. "|cffffd700 Macro|r", 1, 1, 1)
-        GameTooltip:AddLine("Writes a /targetexact macro to your macro book.", 1, 1, 1)
-        GameTooltip:AddLine("Drag it to your action bar, then:", 1, 1, 1)
-        GameTooltip:AddLine("1. Click macro to target the vendor.", 1, 1, 1)
-        GameTooltip:AddLine("2. Right-click NPC  OR  press Interact with Target keybind.", 1, 1, 1)
-        GameTooltip:AddLine("|cffaaaaaa(Key Bindings > Targeting > Interact With Target)|r", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    macroBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    local vendorHint = win:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    vendorHint:SetPoint("TOPLEFT", 166, -146)
-    vendorHint:SetWidth(156)
-    vendorHint:SetJustifyH("LEFT")
-    vendorHint:SetText("|cffaaaaaarTarget vendor → right-click or\nInteract With Target keybind|r")
-
-    -- ----------------------------------------------------------------
     -- Quality sell toggles
     -- ----------------------------------------------------------------
-    MakeDivider(win, -172)
-    MakeHeader(win, "SELL QUALITY", 18, -182)
+    MakeDivider(win, -114)
+    MakeHeader(win, "SELL QUALITY", 18, -124)
 
     local qualityDefs = {
-        { Q_GREY,     "sellGrey",      18,  -202 },
-        { Q_WHITE,    "sellWhite",    110,  -202 },
-        { Q_UNCOMMON, "sellUncommon", 210,  -202 },
-        { Q_RARE,     "sellRare",      18,  -226 },
-        { Q_EPIC,     "sellEpic",     110,  -226 },
+        { Q_GREY,     "sellGrey",      18,  -144 },
+        { Q_WHITE,    "sellWhite",    110,  -144 },
+        { Q_UNCOMMON, "sellUncommon", 210,  -144 },
+        { Q_RARE,     "sellRare",      18,  -168 },
+        { Q_EPIC,     "sellEpic",     110,  -168 },
     }
 
     for _, def in ipairs(qualityDefs) do
@@ -567,11 +506,11 @@ local function EAL_BuildGUI()
     -- ----------------------------------------------------------------
     -- Blacklist section
     -- ----------------------------------------------------------------
-    MakeDivider(win, -252)
-    MakeHeader(win, "ITEM BLACKLIST  (these items are never sold)", 18, -262)
+    MakeDivider(win, -198)
+    MakeHeader(win, "ITEM BLACKLIST  (these items are never sold)", 18, -208)
 
     local inputBox = CreateFrame("EditBox", "EAL_BlacklistInput", win, "InputBoxTemplate")
-    inputBox:SetPoint("TOPLEFT", 18, -284)
+    inputBox:SetPoint("TOPLEFT", 18, -230)
     inputBox:SetWidth(224); inputBox:SetHeight(20)
     inputBox:SetAutoFocus(false)
     inputBox:SetMaxLetters(64)
@@ -596,7 +535,7 @@ local function EAL_BuildGUI()
     end)
 
     local addBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
-    addBtn:SetPoint("TOPLEFT", 250, -282)
+    addBtn:SetPoint("TOPLEFT", 250, -228)
     addBtn:SetWidth(72); addBtn:SetHeight(22)
     addBtn:SetText("Add")
     addBtn:SetScript("OnClick", AddBlacklistEntry)
@@ -605,7 +544,7 @@ local function EAL_BuildGUI()
     -- Scrollable blacklist
     -- ----------------------------------------------------------------
     local listBg = CreateFrame("Frame", nil, win)
-    listBg:SetPoint("TOPLEFT", 14, -310)
+    listBg:SetPoint("TOPLEFT", 14, -256)
     listBg:SetWidth(312); listBg:SetHeight(MAX_ROWS * ROW_HEIGHT + 8)
     listBg:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -665,7 +604,7 @@ local function EAL_BuildGUI()
     -- ----------------------------------------------------------------
     local hint = win:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     hint:SetPoint("BOTTOM", 0, 14)
-    hint:SetText("|cffaaaaaa/eal — toggle  |  /eal macro — create bar macro  |  then right-click vendor|r")
+    hint:SetText("|cffaaaaaa/eal — toggle window  |  /eal enable / disable / reset|r")
 
     EAL_UpdateStatus()
     EAL_RefreshBlacklist()
@@ -708,7 +647,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         gui = EAL_BuildGUI()
-        Print("v1.4 loaded.  |cffffff00/eal|r to open  |  |cffffff00/eal macro|r to create action-bar macro.")
+        Print("v1.5 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
@@ -734,9 +673,7 @@ SlashCmdList["EBAUTOLOOT"] = function(msg)
 
     local cmd = msg and msg:lower():match("^%s*(%S*)") or ""
 
-    if cmd == "macro" then
-        CreateVendorMacro()
-    elseif cmd == "reset" then
+    if cmd == "reset" then
         EAL_DB.blacklist = {}
         EAL_RefreshBlacklist()
         Print("Blacklist cleared.")
