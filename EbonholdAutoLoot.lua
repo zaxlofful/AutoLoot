@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v1.2
+-- EbonholdAutoLoot  v1.3
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -73,13 +73,10 @@ local EAL_DB             -- assigned from SavedVariables on ADDON_LOADED
 local currentState       = S_IDLE
 local bagCheckTimer      = 0
 local waitingForMerchant = false
-local pulseTimer         = 0       -- drives the Open Vendor button pulse
 
 -- GUI handles populated by EAL_BuildGUI
 local g_statusLabel
 local g_enableBtn
-local g_interactBtn         -- SecureActionButtonTemplate — pulsed when vendor needed
-local g_interactBtnGlow     -- highlight texture on the interact button
 local g_blacklistRows = {}
 local g_scrollFrame
 local ROW_HEIGHT      = 22
@@ -228,15 +225,6 @@ local function EAL_UpdateStatus()
 
     if g_enableBtn then
         g_enableBtn:SetText(EAL_DB.enabled and "Disable" or "Enable")
-    end
-
-    -- Show the interact button glow only when we need the player to open the vendor
-    if g_interactBtnGlow then
-        if currentState == S_SELLING then
-            g_interactBtnGlow:Show()
-        else
-            g_interactBtnGlow:Hide()
-        end
     end
 end
 
@@ -415,15 +403,6 @@ local function OnUpdate(self, elapsed)
         end
     end
 
-    -- Pulse the Open Vendor button when the player needs to click it
-    if g_interactBtn and currentState == S_SELLING then
-        pulseTimer = pulseTimer + elapsed
-        local alpha = 0.55 + 0.45 * math.abs(math.sin(pulseTimer * 3))
-        g_interactBtn:SetAlpha(alpha)
-    elseif g_interactBtn then
-        pulseTimer = 0
-        g_interactBtn:SetAlpha(1)
-    end
 end
 
 -------------------------------------------------------------------------------
@@ -465,7 +444,7 @@ local function EAL_BuildGUI()
     -- Main window  (550 tall to accommodate the extra vendor row)
     -- ----------------------------------------------------------------
     local win = CreateFrame("Frame", "EAL_Window", UIParent)
-    win:SetWidth(340); win:SetHeight(552)
+    win:SetWidth(340); win:SetHeight(510)
     win:SetPoint("TOPLEFT", UIParent, "TOPLEFT", EAL_DB.windowX, EAL_DB.windowY)
     win:SetFrameStrata("HIGH")
     win:SetMovable(true)
@@ -492,7 +471,9 @@ local function EAL_BuildGUI()
 
     local closeBtn = CreateFrame("Button", nil, win, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -4, -4)
-    closeBtn:SetScript("OnClick", function() win:Hide() end)
+    closeBtn:SetScript("OnClick", function()
+        if not InCombatLockdown() then win:Hide() end
+    end)
 
     -- ----------------------------------------------------------------
     -- Status row
@@ -532,73 +513,49 @@ local function EAL_BuildGUI()
     sellNowBtn:SetScript("OnClick", function() StartSellCycle() end)
 
     -- ----------------------------------------------------------------
-    -- Row 2: Open Vendor (SecureAction)  +  Create Macro
+    -- Row 2: In-combat vendor — macro button + instruction text
+    -- SecureActionButtonTemplate cannot be parented to a regular addon
+    -- frame; doing so blocks Show/Hide on the parent window.  The correct
+    -- in-combat approach is an action-bar macro (hardware event on click).
     -- ----------------------------------------------------------------
     MakeDivider(win, -114)
-    MakeHeader(win, "IN-COMBAT VENDOR  (target vendor, then right-click or use Interact keybind)", 18, -124)
+    MakeHeader(win, "IN-COMBAT VENDOR", 18, -124)
 
-    -- SecureActionButtonTemplate: the click is a hardware event, so
-    -- InteractUnit is allowed even during combat lockdown.
-    -- IMPORTANT: attributes must not be changed during combat — they are set
-    -- once here and never touched again, so this is safe.
-    local interactBtn = CreateFrame(
-        "Button", "EAL_InteractBtn", win,
-        "SecureActionButtonTemplate, UIPanelButtonTemplate")
-    interactBtn:SetPoint("TOPLEFT", 18, -144)
-    interactBtn:SetWidth(176); interactBtn:SetHeight(28)
-    interactBtn:SetText("|cffffd700Target Vendor|r")
-    interactBtn:SetAttribute("type",      "macro")
-    interactBtn:SetAttribute("macrotext", VENDOR_MACRO_BODY)
-    g_interactBtn = interactBtn
-
-    -- Glow border shown when vendor is needed
-    local glow = interactBtn:CreateTexture(nil, "OVERLAY")
-    glow:SetTexture("Interface\\Buttons\\ButtonHilight-Square")
-    glow:SetBlendMode("ADD")
-    glow:SetAllPoints()
-    glow:Hide()
-    g_interactBtnGlow = glow
-
-    -- Tooltip so the player knows what it does
-    interactBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("|cffffd700Target Vendor (Combat Safe)|r", 1, 1, 1)
-        GameTooltip:AddLine("Targets your " .. VENDOR_PET_NAME .. ".", 1, 1, 1)
-        GameTooltip:AddLine("Then |cffffd700right-click|r the NPC model in the world,", 1, 1, 1)
-        GameTooltip:AddLine("or press your |cffffff00Interact with Target|r keybind", 1, 1, 1)
-        GameTooltip:AddLine("|cffaaaaaa(Key Bindings > Targeting > Interact With Target)|r", 0.7, 0.7, 0.7)
-        GameTooltip:Show()
-    end)
-    interactBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- "Create Macro" button — writes a matching macro to the player's macro book
     local macroBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
-    macroBtn:SetPoint("TOPLEFT", 202, -144)
-    macroBtn:SetWidth(120); macroBtn:SetHeight(28)
+    macroBtn:SetPoint("TOPLEFT", 18, -140)
+    macroBtn:SetWidth(140); macroBtn:SetHeight(26)
     macroBtn:SetText("Create Macro")
     macroBtn:SetScript("OnClick", function() CreateVendorMacro() end)
     macroBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText("|cffffd700Create |cffffff00" .. VENDOR_MACRO_NAME .. "|cffffd700 Macro|r", 1, 1, 1)
-        GameTooltip:AddLine("Creates (or updates) a macro you can drag", 1, 1, 1)
-        GameTooltip:AddLine("to your action bar for in-combat vendor access.", 1, 1, 1)
-        GameTooltip:AddLine("|cffaaaaaa/macro to open your macro book.|r", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine("Writes a /targetexact macro to your macro book.", 1, 1, 1)
+        GameTooltip:AddLine("Drag it to your action bar, then:", 1, 1, 1)
+        GameTooltip:AddLine("1. Click macro to target the vendor.", 1, 1, 1)
+        GameTooltip:AddLine("2. Right-click NPC  OR  press Interact with Target keybind.", 1, 1, 1)
+        GameTooltip:AddLine("|cffaaaaaa(Key Bindings > Targeting > Interact With Target)|r", 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     macroBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+    local vendorHint = win:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    vendorHint:SetPoint("TOPLEFT", 166, -146)
+    vendorHint:SetWidth(156)
+    vendorHint:SetJustifyH("LEFT")
+    vendorHint:SetText("|cffaaaaaarTarget vendor → right-click or\nInteract With Target keybind|r")
+
     -- ----------------------------------------------------------------
     -- Quality sell toggles
     -- ----------------------------------------------------------------
-    MakeDivider(win, -182)
-    MakeHeader(win, "SELL QUALITY", 18, -192)
+    MakeDivider(win, -172)
+    MakeHeader(win, "SELL QUALITY", 18, -182)
 
     local qualityDefs = {
-        { Q_GREY,     "sellGrey",      18,  -212 },
-        { Q_WHITE,    "sellWhite",    110,  -212 },
-        { Q_UNCOMMON, "sellUncommon", 210,  -212 },
-        { Q_RARE,     "sellRare",      18,  -236 },
-        { Q_EPIC,     "sellEpic",     110,  -236 },
+        { Q_GREY,     "sellGrey",      18,  -202 },
+        { Q_WHITE,    "sellWhite",    110,  -202 },
+        { Q_UNCOMMON, "sellUncommon", 210,  -202 },
+        { Q_RARE,     "sellRare",      18,  -226 },
+        { Q_EPIC,     "sellEpic",     110,  -226 },
     }
 
     for _, def in ipairs(qualityDefs) do
@@ -612,11 +569,11 @@ local function EAL_BuildGUI()
     -- ----------------------------------------------------------------
     -- Blacklist section
     -- ----------------------------------------------------------------
-    MakeDivider(win, -266)
-    MakeHeader(win, "ITEM BLACKLIST  (these items are never sold)", 18, -276)
+    MakeDivider(win, -252)
+    MakeHeader(win, "ITEM BLACKLIST  (these items are never sold)", 18, -262)
 
     local inputBox = CreateFrame("EditBox", "EAL_BlacklistInput", win, "InputBoxTemplate")
-    inputBox:SetPoint("TOPLEFT", 18, -298)
+    inputBox:SetPoint("TOPLEFT", 18, -284)
     inputBox:SetWidth(224); inputBox:SetHeight(20)
     inputBox:SetAutoFocus(false)
     inputBox:SetMaxLetters(64)
@@ -641,7 +598,7 @@ local function EAL_BuildGUI()
     end)
 
     local addBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
-    addBtn:SetPoint("TOPLEFT", 250, -296)
+    addBtn:SetPoint("TOPLEFT", 250, -282)
     addBtn:SetWidth(72); addBtn:SetHeight(22)
     addBtn:SetText("Add")
     addBtn:SetScript("OnClick", AddBlacklistEntry)
@@ -650,7 +607,7 @@ local function EAL_BuildGUI()
     -- Scrollable blacklist
     -- ----------------------------------------------------------------
     local listBg = CreateFrame("Frame", nil, win)
-    listBg:SetPoint("TOPLEFT", 14, -324)
+    listBg:SetPoint("TOPLEFT", 14, -310)
     listBg:SetWidth(312); listBg:SetHeight(MAX_ROWS * ROW_HEIGHT + 8)
     listBg:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -753,7 +710,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
             end
         end
         gui = EAL_BuildGUI()
-        Print("v1.1 loaded.  |cffffff00/eal|r to open  |  |cffffff00/eal macro|r to create action-bar macro.")
+        Print("v1.3 loaded.  |cffffff00/eal|r to open  |  |cffffff00/eal macro|r to create action-bar macro.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
@@ -794,6 +751,10 @@ SlashCmdList["EBAUTOLOOT"] = function(msg)
         DismissPet()
         SetState(S_IDLE)
     else
+        if InCombatLockdown() then
+            Print("Cannot open the settings window during combat.", 1, 0.5, 0.5)
+            return
+        end
         if gui:IsShown() then
             gui:Hide()
         else

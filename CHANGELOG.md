@@ -1,5 +1,19 @@
 # Changelog — EbonholdAutoLoot
 
+## [1.3] - 2026-04-06
+
+### Fixed
+- `/eal` no longer triggers "Interface action failed because of an AddOn". Root cause: `SecureActionButtonTemplate` cannot be parented to a regular addon-controlled frame — the engine blocks `Show`/`Hide` on any frame that has secure children.
+
+### Changed
+- Removed the `SecureActionButtonTemplate` "Target Vendor" button from the GUI entirely. The action-bar macro (`/eal macro`) is the correct and fully supported in-combat approach.
+- Replaced the two-button vendor row with a single "Create Macro" button and an instruction hint label.
+- Added `InCombatLockdown()` guard to the `/eal` slash command and the window close button so the GUI is never shown or hidden during combat lockdown.
+- Removed `pulseTimer`, `g_interactBtn`, and `g_interactBtnGlow` runtime variables.
+- Window height reduced back to 510 px.
+
+---
+
 ## [1.2] - 2026-04-06
 
 ### Added
