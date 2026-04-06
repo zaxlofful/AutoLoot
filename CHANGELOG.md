@@ -1,5 +1,16 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.1] - 2026-04-06
+
+### Changed
+- Vendor macro reworked to match the `VendorBind` pattern. Creates a **per-character** macro (`VendorBind`) with `/target Goblin Merchant` and immediately binds **F5** to it via `SetBinding` + `SaveBindings(2)`. The previous approach used a global macro slot and left keybinding to the player; this version wires the key automatically. F5 targets the NPC — the player then presses their separate **Interact with Target** key to open the vendor.
+- GUI button relabelled from "Create Macro" to "Bind F5" to reflect the actual action.
+
+### Fixed
+- Previous v2.0 code called two `SetBinding` calls on the same key (macro + INTERACTTARGET), with the second silently overwriting the first. Corrected to a single `SetBinding` for the targeting macro only.
+
+---
+
 ## [2.0] - 2026-04-06
 
 ### Added

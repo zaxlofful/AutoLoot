@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v2.0
+-- EbonholdAutoLoot  v2.1
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -399,34 +399,42 @@ local function OnUpdate(self, elapsed)
 end
 
 -------------------------------------------------------------------------------
--- 7. VENDOR MACRO
+-- 7. VENDOR MACRO + KEYBIND
 -------------------------------------------------------------------------------
-local VENDOR_MACRO_NAME = "EAL Merchant"
-local VENDOR_MACRO_ICON = "INV_Misc_Coin_02"
-local VENDOR_MACRO_BODY = "/targetexact Goblin Merchant"
+local VENDOR_MACRO_NAME = "VendorBind"
+local VENDOR_MACRO_ICON = "INV_Misc_QuestionMark"
+local VENDOR_MACRO_BODY = "/target " .. VENDOR_PET_NAME   -- "/target Goblin Merchant"
+local VENDOR_BIND_KEY   = "F5"   -- key bound to the targeting macro
 
--- Creates (or refreshes) a general macro named "EAL Merchant" that targets
--- the Goblin Merchant companion NPC.  Must be called outside combat.
--- Returns true on success, false if the macro book is full.
+-- Creates the per-character macro and binds VENDOR_BIND_KEY to it.
+-- A separate key for INTERACTTARGET must be set by the player in Keybindings
+-- (Key bindings → Targeting → Interact with Target).
+-- Must be called outside combat — CreateMacro and SetBinding are both
+-- blocked by InCombatLockdown().
 local function EAL_CreateVendorMacro()
     if InCombatLockdown() then
-        Print("|cffff4444Cannot create macro during combat.|r Log out and back in, or click |cffffff00Create Macro|r while out of combat.")
+        Print("|cffff4444Cannot set up macro during combat.|r Try again after leaving combat.")
         return false
     end
 
-    local existing = GetMacroInfo(VENDOR_MACRO_NAME)
-    if existing then
-        EditMacro(VENDOR_MACRO_NAME, VENDOR_MACRO_NAME, VENDOR_MACRO_ICON, VENDOR_MACRO_BODY, false)
-        Print("|cffffff00EAL Merchant|r macro updated. Drag it from your Macro book to an action bar.")
-    else
-        local numGlobal = GetNumMacros()
-        if numGlobal >= 120 then
-            Print("|cffff4444Macro book is full (120/120).|r Delete a macro then try again.")
+    -- Create the macro if it doesn't already exist (per-character slot)
+    local idx = GetMacroIndexByName(VENDOR_MACRO_NAME)
+    if not idx or idx == 0 then
+        local _, numChar = GetNumMacros()
+        if numChar >= 18 then
+            Print("|cffff4444Per-character macro book full (18/18).|r Delete a macro and try again.")
             return false
         end
-        CreateMacro(VENDOR_MACRO_NAME, VENDOR_MACRO_ICON, VENDOR_MACRO_BODY, false)
-        Print("|cffffff00EAL Merchant|r macro created! Open your |cffffff00Macro book (G)|r, find |cffffff00EAL Merchant|r, and drag it to an action bar.")
+        CreateMacro(VENDOR_MACRO_NAME, VENDOR_MACRO_ICON, VENDOR_MACRO_BODY, 1)
+        Print("|cffffff00" .. VENDOR_MACRO_NAME .. "|r macro created.")
     end
+
+    -- Bind the target key to the macro
+    SetBinding(VENDOR_BIND_KEY, "MACRO " .. VENDOR_MACRO_NAME)
+    SaveBindings(2)   -- 2 = per-character bindings
+
+    Print("|cffffff00" .. VENDOR_BIND_KEY .. "|r → targets " .. VENDOR_PET_NAME ..
+          "  |  then press your |cffffff00Interact with Target|r key to open the vendor.")
     return true
 end
 
@@ -544,12 +552,12 @@ local function EAL_BuildGUI()
     macroHint:SetPoint("TOPLEFT", 18, -126)
     macroHint:SetWidth(210)
     macroHint:SetJustifyH("LEFT")
-    macroHint:SetText("|cffaaaaааTarget the Goblin Merchant during combat:|r")
+    macroHint:SetText("|cffaaaaaa[F5] targets vendor  |  then press Interact key|r")
 
     local macroBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
     macroBtn:SetPoint("TOPLEFT", 232, -122)
     macroBtn:SetWidth(90); macroBtn:SetHeight(22)
-    macroBtn:SetText("Create Macro")
+    macroBtn:SetText("Bind F5")
     macroBtn:SetScript("OnClick", function() EAL_CreateVendorMacro() end)
 
     -- ----------------------------------------------------------------
@@ -733,7 +741,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         gui = EAL_BuildGUI()
         EAL_CreateVendorMacro()   -- auto-create at login (always outside combat)
-        Print("v2.0 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v2.1 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
