@@ -1,5 +1,12 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.7] - 2026-04-09
+
+### Changed
+- Renamed all player-facing "blacklist" text to "whitelist": GUI section header now reads `ITEM WHITELIST`, sell summary message now says "Whitelisted (kept):", and the `/eal reset` confirmation prints "Whitelist cleared." Internal variable and function names unchanged.
+
+---
+
 ## [2.6] - 2026-04-09
 
 ### Added

@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v2.6
+-- EbonholdAutoLoot  v2.7
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -15,7 +15,7 @@
 -- GUI Features:
 --   - Enable / Disable the full loot+sell cycle
 --   - Per-quality sell toggles: Grey / White / Uncommon / Rare / Epic
---   - Item blacklist: named items are never sold regardless of quality
+--   - Item whitelist: named items are never sold regardless of quality
 --   - Live status display with free-slot counter
 --
 -- Slash commands:  /eal   /autoloot
@@ -340,7 +340,7 @@ local function SellItems(totalSold, totalSkipped)
     else
         if totalSold > 0 or totalSkipped > 0 then
             Print("Sold |cffffff00" .. totalSold ..
-                  "|r item(s). Blacklist protected: |cffffff00" .. totalSkipped .. "|r.")
+                  "|r item(s). Whitelisted (kept): |cffffff00" .. totalSkipped .. "|r.")
         else
             Print("Nothing to sell with current quality settings.")
         end
@@ -721,7 +721,7 @@ local function EAL_BuildGUI()
     -- Blacklist section
     -- ----------------------------------------------------------------
     MakeDivider(win, -234)
-    MakeHeader(win, "ITEM BLACKLIST  (these items are never sold)", 18, -244)
+    MakeHeader(win, "ITEM WHITELIST  (these items are never sold)", 18, -244)
 
     local inputBox = CreateFrame("EditBox", "EAL_BlacklistInput", win, "InputBoxTemplate")
     inputBox:SetPoint("TOPLEFT", 18, -266)
@@ -882,7 +882,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         gui       = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
-        Print("v2.6 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v2.7 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
@@ -911,7 +911,7 @@ SlashCmdList["EBAUTOLOOT"] = function(msg)
     if cmd == "reset" then
         EAL_DB.blacklist = {}
         EAL_RefreshBlacklist()
-        Print("Blacklist cleared.")
+        Print("Whitelist cleared.")
     elseif cmd == "enable" then
         EAL_DB.enabled = true
         StartLootCycle()
