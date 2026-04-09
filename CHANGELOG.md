@@ -1,5 +1,13 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.8] - 2026-04-09
+
+### Changed
+- README fully rewritten to reflect all features from v2.2 onward: on-screen vendor button, mount-aware companion management, item whitelist (renamed from blacklist), Tome of Echo one-click whitelisting, updated GUI diagram, and corrected selling-in-combat instructions.
+- Fixed arrow glyph (`→`) in vendor hint text — replaced with a plain comma as the character is unsupported in WoW 3.3.5a's font.
+
+---
+
 ## [2.7] - 2026-04-09
 
 ### Changed
