@@ -668,7 +668,7 @@ local function EAL_BuildGUI()
     vendorHint:SetPoint("TOPLEFT", 18, -126)
     vendorHint:SetWidth(210)
     vendorHint:SetJustifyH("LEFT")
-    vendorHint:SetText("|cffaaaaaaClick vendor button → then Interact key to sell|r")
+    vendorHint:SetText("|cffaaaaaaClick vendor button, then Interact key to sell|r")
 
     local function UpdateVendorToggleBtn(btn)
         if EAL_DB.vendorBtnShown then
