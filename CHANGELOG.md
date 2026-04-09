@@ -1,5 +1,12 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.6] - 2026-04-09
+
+### Added
+- **"Whitelist all Tome of Echo: in bags"** button in the blacklist panel. Scans all bag slots and adds every item whose name begins with `Tome of Echo:` to the blacklist (skipping duplicates). Prints how many were added. Uses a prefix-match (`string.sub` against `"tome of echo:"`) so no regex escaping is needed.
+
+---
+
 ## [2.5] - 2026-04-06
 
 ### Changed

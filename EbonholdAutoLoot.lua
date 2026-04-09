@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v2.5
+-- EbonholdAutoLoot  v2.6
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -132,6 +132,36 @@ local function IsBlacklisted(itemName)
         if entry:lower() == lower then return true end
     end
     return false
+end
+
+local TOME_PREFIX       = "Tome of Echo:"
+local TOME_PREFIX_LOWER = TOME_PREFIX:lower()
+
+-- Scans all bag slots and adds every item whose name starts with
+-- "Tome of Echo:" to the blacklist (if not already present).
+local function EAL_WhitelistTomes()
+    local added = 0
+    for bag = 0, 4 do
+        local numSlots = GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local link = GetContainerItemLink(bag, slot)
+            if link then
+                local name = GetItemInfo(link)
+                if name and name:lower():sub(1, #TOME_PREFIX_LOWER) == TOME_PREFIX_LOWER then
+                    if not IsBlacklisted(name) then
+                        table.insert(EAL_DB.blacklist, name)
+                        added = added + 1
+                    end
+                end
+            end
+        end
+    end
+    if added > 0 then
+        EAL_RefreshBlacklist()
+        Print("|cffffff00" .. added .. "|r Tome of Echo item(s) whitelisted.")
+    else
+        Print("No new Tome of Echo items found in bags (already whitelisted or not in bags).")
+    end
 end
 
 -- Returns companion index (1-based) and whether it is currently summoned.
@@ -563,7 +593,7 @@ local function EAL_BuildGUI()
     -- Main window  (550 tall to accommodate the extra vendor row)
     -- ----------------------------------------------------------------
     local win = CreateFrame("Frame", "EAL_Window", UIParent)
-    win:SetWidth(340); win:SetHeight(496)
+    win:SetWidth(340); win:SetHeight(522)
     win:SetPoint("TOPLEFT", UIParent, "TOPLEFT", EAL_DB.windowX, EAL_DB.windowY)
     win:SetFrameStrata("HIGH")
     win:SetMovable(true)
@@ -724,12 +754,18 @@ local function EAL_BuildGUI()
     addBtn:SetText("Add")
     addBtn:SetScript("OnClick", AddBlacklistEntry)
 
+    local tomeBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
+    tomeBtn:SetPoint("TOPLEFT", 18, -290)
+    tomeBtn:SetWidth(304); tomeBtn:SetHeight(22)
+    tomeBtn:SetText('Whitelist all "Tome of Echo:" in bags')
+    tomeBtn:SetScript("OnClick", EAL_WhitelistTomes)
+
     -- ----------------------------------------------------------------
     -- Scrollable blacklist  (hand-rolled, mouse-wheel scroll)
     -- ----------------------------------------------------------------
     local TRACK_W = 8   -- width of the slim scrollbar track on the right
     local listBg = CreateFrame("Frame", nil, win)
-    listBg:SetPoint("TOPLEFT", 14, -292)
+    listBg:SetPoint("TOPLEFT", 14, -318)
     listBg:SetWidth(312); listBg:SetHeight(MAX_ROWS * ROW_HEIGHT + 8)
     listBg:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -846,7 +882,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         gui       = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
-        Print("v2.5 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v2.6 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
