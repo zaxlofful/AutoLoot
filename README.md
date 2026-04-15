@@ -124,6 +124,14 @@ The button can be shown or hidden at any time from the **Show/Hide Vendor Btn** 
 
 ---
 
+## Contributors
+
+| Contributor | Contribution |
+|---|---|
+| [zaxlofful](https://github.com/zaxlofful) (Zachary Laughlin) | PR #1 — reduced sell batch size and increased inter-batch delay to prevent disconnects on large inventories |
+
+---
+
 ## Compatibility
 
 - **WoW version:** 3.3.5a (Interface 30300)
