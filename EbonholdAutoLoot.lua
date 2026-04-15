@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v2.8
+-- EbonholdAutoLoot  v2.9
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -45,9 +45,10 @@ local MAX_COMPANION_DISTANCE = 5   -- yards; resummon if pet exceeds this from p
 
 -- Per-pulse sell cap: avoids flooding the server with too many UseContainerItem
 -- calls in a single MERCHANT_SHOW callback, which can cause low-end clients to
--- disconnect.  If more items remain after the cap is hit, open the vendor again
--- to sell the next batch.
-local MAX_SELL_PER_PULSE = 80
+-- disconnect. If more items remain after the cap is hit, additional batches
+-- are sold automatically after a short delay while MerchantFrame stays open;
+-- if it closes first, the sell cycle still finishes cleanly.
+local MAX_SELL_PER_PULSE = 45
 
 -- SavedVariables schema / defaults
 local DEFAULTS = {
@@ -284,9 +285,21 @@ local function EAL_RefreshBlacklist()
 end
 
 -------------------------------------------------------------------------------
--- 5. SELLING LOGIC
+-- 4. SELLING LOGIC
 -------------------------------------------------------------------------------
 -- totalSold / totalSkipped accumulate across batches within a single vendor session.
+local SELL_BATCH_DELAY = 1.0
+
+local function FinishSelling(totalSold, totalSkipped)
+    if totalSold > 0 or totalSkipped > 0 then
+        Print("Sold |cffffff00" .. totalSold ..
+              "|r item(s). Whitelisted (kept): |cffffff00" .. totalSkipped .. "|r.")
+    else
+        Print("Nothing to sell with current quality settings.")
+    end
+    EAL_UpdateStatus()
+end
+
 local function SellItems(totalSold, totalSkipped)
     totalSold    = totalSold    or 0
     totalSkipped = totalSkipped or 0
@@ -330,26 +343,24 @@ local function SellItems(totalSold, totalSkipped)
     totalSold    = totalSold    + sold
     totalSkipped = totalSkipped + skipped
 
-    -- If we hit the cap and the vendor window is still open, wait 0.5 s then
-    -- sell the next batch.  Sold items are gone from the bags so re-scanning
-    -- from bag 0 naturally picks up the remainder.
+    -- If we hit the cap and the vendor window is still open, wait
+    -- SELL_BATCH_DELAY seconds, then sell the next batch. Sold items are gone
+    -- from the bags so re-scanning from bag 0 naturally picks up the remainder.
     if capped and MerchantFrame:IsShown() then
-        After(0.5, function()
-            SellItems(totalSold, totalSkipped)
+        After(SELL_BATCH_DELAY, function()
+            if MerchantFrame:IsShown() then
+                SellItems(totalSold, totalSkipped)
+            else
+                FinishSelling(totalSold, totalSkipped)
+            end
         end)
     else
-        if totalSold > 0 or totalSkipped > 0 then
-            Print("Sold |cffffff00" .. totalSold ..
-                  "|r item(s). Whitelisted (kept): |cffffff00" .. totalSkipped .. "|r.")
-        else
-            Print("Nothing to sell with current quality settings.")
-        end
-        EAL_UpdateStatus()
+        FinishSelling(totalSold, totalSkipped)
     end
 end
 
 -------------------------------------------------------------------------------
--- 6. STATE MACHINE
+-- 5. STATE MACHINE
 -------------------------------------------------------------------------------
 local function SetState(state)
     currentState = state
@@ -474,6 +485,7 @@ local function OnUpdate(self, elapsed)
         bagCheckTimer = bagCheckTimer + elapsed
         if bagCheckTimer >= (EAL_DB.checkInterval or 3) then
             bagCheckTimer = 0
+            EAL_UpdateStatus()
             if GetTotalFreeSlots() == 0 then
                 StartSellCycle()
             else
@@ -487,7 +499,7 @@ local function OnUpdate(self, elapsed)
 end
 
 -------------------------------------------------------------------------------
--- 7. ON-SCREEN VENDOR BUTTON
+-- 6. ON-SCREEN VENDOR BUTTON
 -------------------------------------------------------------------------------
 -- A SecureActionButtonTemplate button parented directly to UIParent.
 -- Its attribute is set once at creation (outside combat) so it remains
@@ -555,7 +567,7 @@ local function EAL_BuildVendorButton()
 end
 
 -------------------------------------------------------------------------------
--- 8. GUI
+-- 7. GUI
 -------------------------------------------------------------------------------
 local function MakeHeader(parent, text, x, y)
     local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -616,7 +628,7 @@ local function EAL_BuildGUI()
     -- Title bar
     local title = win:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -14)
-    title:SetText("|cffff9900Ebonhold|r AutoLoot  |cffaaaaaa& Sell|r")
+    title:SetText("|cffff9900Ebonhold|r AutoLoot |cffaaaaaa& Sell|r")
 
     local closeBtn = CreateFrame("Button", nil, win, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -4, -4)
@@ -882,7 +894,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         gui       = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
-        Print("v2.8 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v2.9 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()

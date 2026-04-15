@@ -1,5 +1,18 @@
 # Changelog — EbonholdAutoLoot
 
+## [2.9] - 2026-04-15
+
+### Changed
+- `MAX_SELL_PER_PULSE` reduced from 80 → **45** items per batch to prevent disconnects on larger inventories (contributed by @zaxlofful, PR #1).
+- Inter-batch delay increased from 0.5 s → **1.0 s** (`SELL_BATCH_DELAY`) for the same reason.
+- Extracted `FinishSelling(totalSold, totalSkipped)` helper — deduplicates the summary print/status update that previously appeared in two branches of `SellItems`.
+- Added guard in the batch continuation callback: if `MerchantFrame` closes between the delay firing and the next sell pass, `FinishSelling` is called cleanly instead of attempting to sell against a closed vendor window.
+- `EAL_UpdateStatus()` now called on every bag-check tick so the free-slot counter stays current while looting.
+
+> **High-end hardware users:** A separate release `EbonholdAutoLoot-v2.9-highend` is available with the original `MAX_SELL_PER_PULSE = 80` / `SELL_BATCH_DELAY = 0.5 s` settings for machines that do not experience disconnects with the larger batch size.
+
+---
+
 ## [2.8] - 2026-04-09
 
 ### Changed

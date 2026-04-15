@@ -8,7 +8,7 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 
 - **Auto-loot cycle** — Summons the Greedy Scavenger and monitors your bags every 3 seconds. When every slot is full it automatically dismisses the Scavenger and summons the Goblin Merchant.
 - **Auto-repair** — Calls `RepairAllItems()` the moment a merchant window opens, before selling, so durability is always restored first.
-- **Auto-sell on merchant open** — Scans your bags and sells all qualifying items the instant any vendor window opens. Items are sold in batches of up to 80 per pulse with a 0.5-second pause between batches; the vendor window stays open throughout and a single summary prints when the last batch finishes.
+- **Auto-sell on merchant open** — Scans your bags and sells all qualifying items the instant any vendor window opens. Items are sold in batches of up to **45 per pulse** with a **1.0-second pause** between batches to prevent server disconnects on large inventories; the vendor window stays open throughout and a single summary prints when the last batch finishes. A high-end release with the original 80-item / 0.5 s settings is available separately for machines that do not experience disconnects.
 - **Per-quality sell toggles** — Choose exactly which quality tiers to sell: Grey, White, Uncommon, Rare, and/or Epic.
 - **Item whitelist** — Add item names to a protected list; whitelisted items are never sold regardless of quality.
 - **Whitelist Tome of Echo items** — One-click button scans your bags and whitelists every item whose name starts with `Tome of Echo:` automatically.
@@ -104,6 +104,7 @@ The button can be shown or hidden at any time from the **Show/Hide Vendor Btn** 
 
 | Version | Notes |
 |---|---|
+| 2.9 | Reduced batch size to 45 items and increased inter-batch delay to 1.0 s to prevent disconnects on large inventories (PR #1 by @zaxlofful). Added `FinishSelling` helper and guard for vendor closing mid-batch. Status bar now refreshes every bag-check tick. High-end release also available (80 items / 0.5 s). |
 | 2.8 | README updated to reflect all current features; arrow glyph fixed in vendor hint text. |
 | 2.7 | Renamed all player-facing "blacklist" text to "whitelist". |
 | 2.6 | Added "Whitelist all Tome of Echo: in bags" one-click button. |
