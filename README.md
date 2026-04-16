@@ -8,7 +8,8 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 
 - **Auto-loot cycle** — Summons the Greedy Scavenger and monitors your bags every 3 seconds. When every slot is full it automatically dismisses the Scavenger and summons the Goblin Merchant.
 - **Auto-repair** — Calls `RepairAllItems()` the moment a merchant window opens, before selling, so durability is always restored first.
-- **Auto-sell on merchant open** — Scans your bags and sells all qualifying items the instant any vendor window opens. Items are sold in batches of up to **45 per pulse** with a **1.0-second pause** between batches to prevent server disconnects on large inventories; the vendor window stays open throughout and a single summary prints when the last batch finishes. A high-end release with the original 80-item / 0.5 s settings is available separately for machines that do not experience disconnects.
+- **Auto-sell on merchant open** — Scans your bags and sells all qualifying items the instant any vendor window opens. Items are sold in batches of up to **45 per pulse** with a **1.0-second pause** between batches to prevent server disconnects on large inventories; the vendor window stays open throughout and a single summary prints when the last batch finishes.
+- **Fast Mode** — Optional toggle in the status row. Doubles items sold per batch (45 → 90) and halves the inter-batch delay (1.0s → 0.5s). Use on higher-end hardware only — a tooltip warns of potential disconnects. Setting persists between sessions.
 - **Per-quality sell toggles** — Choose exactly which quality tiers to sell: Grey, White, Uncommon, Rare, and/or Epic.
 - **Item whitelist** — Add item names to a protected list; whitelisted items are never sold regardless of quality.
 - **Whitelist Tome of Echo items** — One-click button scans your bags and whitelists every item whose name starts with `Tome of Echo:` automatically.
@@ -73,28 +74,31 @@ The button can be shown or hidden at any time from the **Show/Hide Vendor Btn** 
 ## GUI Overview
 
 ```
-┌─────────────────────────────────────┐
-│       Ebonhold AutoLoot & Sell      │
-├─────────────────────────────────────┤
-│ Status: LOOTING   Free Slots: 12    │
-├─────────────────────────────────────┤
-│ [  Enable/Disable  ] [Force Sell Now] │
-├─────────────────────────────────────┤
-│ Click vendor button, then Interact  │
-│ key to sell          [Show Vendor Btn] │
-├─────────────────────────────────────┤
-│ SELL QUALITY                        │
-│ [x] Grey  [ ] White  [ ] Uncommon  │
-│ [ ] Rare  [ ] Epic                  │
-├─────────────────────────────────────┤
-│ ITEM WHITELIST                      │
-│ [Item Name Input         ] [  Add  ] │
-│ [Whitelist all "Tome of Echo:" in bags] │
-│ ┌─────────────────────────────────┐ │
-│ │ Hearthstone            [Remove] │ │
-│ │ Tome of Echo: Fire     [Remove] │ │
-│ └─────────────────────────────────┘ │
-└─────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│        Ebonhold AutoLoot & Sell         │
+├─────────────────────────────────────────┤
+│ Status: LOOTING  Free Slots: 12         │
+│                        [ ] Fast Mode    │
+├─────────────────────────────────────────┤
+│ [ Enable/Disable ]    [ Force Sell Now ]│
+├─────────────────────────────────────────┤
+│ Click vendor button, then Interact key  │
+│ to sell               [Show Vendor Btn] │
+├─────────────────────────────────────────┤
+│ SELL QUALITY                            │
+│ [x] Grey  [ ] White  [ ] Uncommon       │
+│ [ ] Rare  [ ] Epic                      │
+├─────────────────────────────────────────┤
+│ [ Delete All Savage PvP Gear from Bags ]│
+├─────────────────────────────────────────┤
+│ ITEM WHITELIST                          │
+│ [Item Name Input            ] [  Add  ] │
+│ [ Whitelist all "Tome of Echo:" in bags]│
+│ ┌───────────────────────────────────┐   │
+│ │ Hearthstone              [Remove] │   │
+│ │ Tome of Echo: Fire       [Remove] │   │
+│ └───────────────────────────────────┘   │
+└─────────────────────────────────────────┘
 ```
 
 *The on-screen Vendor button floats separately from this window. Alt+Drag to reposition it.*
@@ -105,6 +109,7 @@ The button can be shown or hidden at any time from the **Show/Hide Vendor Btn** 
 
 | Version | Notes |
 |---|---|
+| 3.1 | Added **Fast Mode** toggle (PR #4 by @zaxlofful) — doubles items sold per batch and halves inter-batch delay. Replaces the separate high-end release. |
 | 3.0 | Added "Delete All Savage PvP Gear" button — async one-at-a-time deletion with auto-confirmation of quality popups. |
 | 2.9 | Reduced batch size to 45 items and increased inter-batch delay to 1.0 s to prevent disconnects on large inventories (PR #1 by @zaxlofful). Added `FinishSelling` helper and guard for vendor closing mid-batch. Status bar now refreshes every bag-check tick. High-end release also available (80 items / 0.5 s). |
 | 2.8 | README updated to reflect all current features; arrow glyph fixed in vendor hint text. |
@@ -131,6 +136,7 @@ The button can be shown or hidden at any time from the **Show/Hide Vendor Btn** 
 | Contributor | Contribution |
 |---|---|
 | [zaxlofful](https://github.com/zaxlofful) (Zachary Laughlin) | PR #1 — reduced sell batch size and increased inter-batch delay to prevent disconnects on large inventories |
+| [zaxlofful](https://github.com/zaxlofful) (Zachary Laughlin) | PR #4 — Fast Mode toggle: doubles sell batch size and halves inter-batch delay for higher-end hardware |
 
 ---
 

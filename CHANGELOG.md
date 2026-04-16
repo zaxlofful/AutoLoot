@@ -1,5 +1,15 @@
 # Changelog — EbonholdAutoLoot
 
+## [3.1] - 2026-04-16
+
+### Added
+- **Fast Mode** checkbox in the status row (contributed by @zaxlofful, PR #4). When enabled, doubles `MAX_SELL_PER_PULSE` (45 → 90) and halves `SELL_BATCH_DELAY` (1.0s → 0.5s) per sell pass. Toggling takes effect on the next batch. A tooltip warns that this may cause disconnects on lower-end hardware. Setting persisted via `SavedVariables`.
+
+### Removed
+- Dual high-end / standard release model dropped. Fast Mode replaces the need for a separate high-end zip — users can toggle it on or off in-game.
+
+---
+
 ## [3.0] - 2026-04-15
 
 ### Added

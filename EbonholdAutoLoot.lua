@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v3.0
+-- EbonholdAutoLoot  v3.1
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -50,6 +50,10 @@ local MAX_COMPANION_DISTANCE = 5   -- yards; resummon if pet exceeds this from p
 -- if it closes first, the sell cycle still finishes cleanly.
 local MAX_SELL_PER_PULSE = 45
 
+-- Fast Mode multipliers: doubles items per batch, halves the batch delay.
+local FAST_MODE_BATCH_MULTIPLIER = 2
+local FAST_MODE_DELAY_DIVISOR    = 2
+
 -- SavedVariables schema / defaults
 local DEFAULTS = {
     enabled       = false,
@@ -58,6 +62,7 @@ local DEFAULTS = {
     sellUncommon  = false,
     sellRare      = false,
     sellEpic      = false,
+    fastMode      = false,
     blacklist     = {},
     checkInterval  = 3,     -- seconds between free-slot checks while looting
     windowX        = 100,
@@ -373,6 +378,9 @@ local function SellItems(totalSold, totalSkipped)
     local skipped = 0
     local capped  = false
 
+    local PULSE_CAP   = EAL_DB.fastMode and (MAX_SELL_PER_PULSE * FAST_MODE_BATCH_MULTIPLIER) or MAX_SELL_PER_PULSE
+    local BATCH_DELAY = EAL_DB.fastMode and (SELL_BATCH_DELAY / FAST_MODE_DELAY_DIVISOR) or SELL_BATCH_DELAY
+
     for bag = 0, 4 do
         if capped then break end
         local numSlots = GetContainerNumSlots(bag)
@@ -396,7 +404,7 @@ local function SellItems(totalSold, totalSkipped)
                     if sell then
                         UseContainerItem(bag, slot)
                         sold = sold + 1
-                        if sold >= MAX_SELL_PER_PULSE then
+                        if sold >= PULSE_CAP then
                             capped = true
                             break
                         end
@@ -410,10 +418,10 @@ local function SellItems(totalSold, totalSkipped)
     totalSkipped = totalSkipped + skipped
 
     -- If we hit the cap and the vendor window is still open, wait
-    -- SELL_BATCH_DELAY seconds, then sell the next batch. Sold items are gone
+    -- BATCH_DELAY seconds, then sell the next batch. Sold items are gone
     -- from the bags so re-scanning from bag 0 naturally picks up the remainder.
     if capped and MerchantFrame:IsShown() then
-        After(SELL_BATCH_DELAY, function()
+        After(BATCH_DELAY, function()
             if MerchantFrame:IsShown() then
                 SellItems(totalSold, totalSkipped)
             else
@@ -701,14 +709,37 @@ local function EAL_BuildGUI()
     closeBtn:SetScript("OnClick", function() win:Hide() end)
 
     -- ----------------------------------------------------------------
-    -- Status row
+    -- Status row  (status text left, Fast Mode checkbox right)
     -- ----------------------------------------------------------------
     MakeDivider(win, -36)
     local statusLabel = win:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     statusLabel:SetPoint("TOPLEFT", 18, -48)
-    statusLabel:SetWidth(300)
+    statusLabel:SetWidth(200)
     statusLabel:SetJustifyH("LEFT")
     g_statusLabel = statusLabel
+
+    local fastModeCb = CreateFrame("CheckButton", nil, win, "UICheckButtonTemplate")
+    fastModeCb:SetPoint("TOPRIGHT", -11, -42)
+    fastModeCb:SetWidth(24); fastModeCb:SetHeight(24)
+    fastModeCb:SetChecked(EAL_DB.fastMode)
+
+    local fastModeLbl = win:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fastModeLbl:SetPoint("RIGHT", fastModeCb, "LEFT", -2, 0)
+    fastModeLbl:SetText("|cffff4444Fast Mode|r")
+
+    fastModeCb:SetScript("OnClick", function(self)
+        EAL_DB.fastMode = self:GetChecked() and true or false
+    end)
+    fastModeCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+        GameTooltip:AddLine("|cffff4444Fast Mode|r")
+        GameTooltip:AddLine("|cffff9900Warning: may cause disconnects on|r")
+        GameTooltip:AddLine("|cffff9900lower-end hardware.|r")
+        GameTooltip:AddLine("|cffaaaaaaDoubles items sold per batch and|r")
+        GameTooltip:AddLine("|cffaaaaaahalves the delay between batches.|r")
+        GameTooltip:Show()
+    end)
+    fastModeCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- ----------------------------------------------------------------
     -- Row 1: Enable / Disable  +  Force Sell
@@ -972,7 +1003,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         gui       = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
-        Print("v3.0 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v3.1 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
