@@ -1,5 +1,12 @@
 # Changelog — EbonholdAutoLoot
 
+## [3.0] - 2026-04-15
+
+### Added
+- **Delete All Savage PvP Gear** button in the GUI (red text, between the quality toggles and the whitelist panel). Scans all bags for items whose name starts with `"Savage "` and deletes them one at a time. Each deletion is async: `PickupContainerItem` + `DeleteCursorItem` fires, then a 50 ms delay allows the `DELETE_ITEM` confirmation popup (shown for Uncommon+ items) to appear and be auto-confirmed via `StaticPopup_FindVisible` + `Button1:Click()`, then a further 150 ms delay before the next item. Blocked during combat (`InCombatLockdown()`).
+
+---
+
 ## [2.9] - 2026-04-15
 
 ### Changed

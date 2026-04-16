@@ -12,6 +12,7 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 - **Per-quality sell toggles** — Choose exactly which quality tiers to sell: Grey, White, Uncommon, Rare, and/or Epic.
 - **Item whitelist** — Add item names to a protected list; whitelisted items are never sold regardless of quality.
 - **Whitelist Tome of Echo items** — One-click button scans your bags and whitelists every item whose name starts with `Tome of Echo:` automatically.
+- **Delete Savage PvP gear** — One-click button scans all bags and permanently deletes every item whose name starts with `Savage `. Deletions are processed one at a time with automatic confirmation of the quality-check popup. Blocked during combat.
 - **On-screen vendor button** — A draggable `SecureActionButtonTemplate` button (parented to UIParent) targets the Goblin Merchant on click. Works in and out of combat. Alt+Drag to reposition; position is saved between sessions.
 - **Mount-aware companion management** — Dismisses the active companion automatically when you mount. Re-summons the correct pet (Greedy Scavenger or Goblin Merchant) 1.5 seconds after dismounting.
 - **Companion stuck detection** — Every bag-check tick, if the Greedy Scavenger drifts more than 5 yards from the player it is automatically dismissed and re-summoned. Skipped while mounted or airborne.
@@ -104,6 +105,7 @@ The button can be shown or hidden at any time from the **Show/Hide Vendor Btn** 
 
 | Version | Notes |
 |---|---|
+| 3.0 | Added "Delete All Savage PvP Gear" button — async one-at-a-time deletion with auto-confirmation of quality popups. |
 | 2.9 | Reduced batch size to 45 items and increased inter-batch delay to 1.0 s to prevent disconnects on large inventories (PR #1 by @zaxlofful). Added `FinishSelling` helper and guard for vendor closing mid-batch. Status bar now refreshes every bag-check tick. High-end release also available (80 items / 0.5 s). |
 | 2.8 | README updated to reflect all current features; arrow glyph fixed in vendor hint text. |
 | 2.7 | Renamed all player-facing "blacklist" text to "whitelist". |

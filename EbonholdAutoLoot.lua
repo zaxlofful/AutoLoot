@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v2.9
+-- EbonholdAutoLoot  v3.0
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -137,6 +137,72 @@ end
 
 local TOME_PREFIX       = "Tome of Echo:"
 local TOME_PREFIX_LOWER = TOME_PREFIX:lower()
+
+local SAVAGE_PREFIX_LOWER = "savage "
+
+-- Scans all bags, collects every item whose name starts with "Savage ",
+-- then deletes them one at a time with a small async delay so the
+-- StaticPopup confirmation dialog (shown for Uncommon+ items) can be
+-- auto-confirmed between each deletion.
+local function EAL_DeleteSavageGear()
+    if InCombatLockdown() then
+        Print("|cffff4444Cannot delete items during combat.|r")
+        return
+    end
+
+    local toDelete = {}
+    for bag = 0, 4 do
+        local numSlots = GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local link = GetContainerItemLink(bag, slot)
+            if link then
+                local name = GetItemInfo(link)
+                if name and name:lower():sub(1, #SAVAGE_PREFIX_LOWER) == SAVAGE_PREFIX_LOWER then
+                    table.insert(toDelete, { bag = bag, slot = slot })
+                end
+            end
+        end
+    end
+
+    if #toDelete == 0 then
+        Print("No Savage PvP gear found in bags.")
+        return
+    end
+
+    local total = #toDelete
+    Print("Deleting |cffffff00" .. total .. "|r Savage PvP item(s)...")
+
+    local function DeleteNext(idx)
+        if idx > #toDelete then
+            Print("|cffffff00" .. total .. "|r Savage PvP item(s) deleted.")
+            return
+        end
+        local item = toDelete[idx]
+        local link = GetContainerItemLink(item.bag, item.slot)
+        if link then
+            local name = GetItemInfo(link)
+            if name and name:lower():sub(1, #SAVAGE_PREFIX_LOWER) == SAVAGE_PREFIX_LOWER then
+                ClearCursor()
+                PickupContainerItem(item.bag, item.slot)
+                DeleteCursorItem()
+                -- Give the confirmation popup a frame to appear, then click OK
+                After(0.05, function()
+                    local popup = StaticPopup_FindVisible("DELETE_ITEM")
+                    if popup then
+                        local btn = _G[popup .. "Button1"]
+                        if btn then btn:Click() end
+                    end
+                    After(0.15, function() DeleteNext(idx + 1) end)
+                end)
+                return
+            end
+        end
+        -- Slot already empty or item changed — skip to next
+        DeleteNext(idx + 1)
+    end
+
+    DeleteNext(1)
+end
 
 -- Scans all bag slots and adds every item whose name starts with
 -- "Tome of Echo:" to the blacklist (if not already present).
@@ -605,7 +671,7 @@ local function EAL_BuildGUI()
     -- Main window  (550 tall to accommodate the extra vendor row)
     -- ----------------------------------------------------------------
     local win = CreateFrame("Frame", "EAL_Window", UIParent)
-    win:SetWidth(340); win:SetHeight(522)
+    win:SetWidth(340); win:SetHeight(550)
     win:SetPoint("TOPLEFT", UIParent, "TOPLEFT", EAL_DB.windowX, EAL_DB.windowY)
     win:SetFrameStrata("HIGH")
     win:SetMovable(true)
@@ -730,13 +796,25 @@ local function EAL_BuildGUI()
     end
 
     -- ----------------------------------------------------------------
-    -- Blacklist section
+    -- Savage PvP gear deletion
     -- ----------------------------------------------------------------
-    MakeDivider(win, -234)
-    MakeHeader(win, "ITEM WHITELIST  (these items are never sold)", 18, -244)
+    MakeDivider(win, -222)
+
+    local savageBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
+    savageBtn:SetPoint("TOPLEFT", 18, -232)
+    savageBtn:SetWidth(304); savageBtn:SetHeight(22)
+    savageBtn:SetText("Delete All Savage PvP Gear from Bags")
+    savageBtn:GetNormalFontObject():SetTextColor(1, 0.35, 0.35)
+    savageBtn:SetScript("OnClick", EAL_DeleteSavageGear)
+
+    -- ----------------------------------------------------------------
+    -- Whitelist section
+    -- ----------------------------------------------------------------
+    MakeDivider(win, -262)
+    MakeHeader(win, "ITEM WHITELIST  (these items are never sold)", 18, -272)
 
     local inputBox = CreateFrame("EditBox", "EAL_BlacklistInput", win, "InputBoxTemplate")
-    inputBox:SetPoint("TOPLEFT", 18, -266)
+    inputBox:SetPoint("TOPLEFT", 18, -294)
     inputBox:SetWidth(224); inputBox:SetHeight(20)
     inputBox:SetAutoFocus(false)
     inputBox:SetMaxLetters(64)
@@ -761,13 +839,13 @@ local function EAL_BuildGUI()
     end)
 
     local addBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
-    addBtn:SetPoint("TOPLEFT", 250, -264)
+    addBtn:SetPoint("TOPLEFT", 250, -292)
     addBtn:SetWidth(72); addBtn:SetHeight(22)
     addBtn:SetText("Add")
     addBtn:SetScript("OnClick", AddBlacklistEntry)
 
     local tomeBtn = CreateFrame("Button", nil, win, "GameMenuButtonTemplate")
-    tomeBtn:SetPoint("TOPLEFT", 18, -290)
+    tomeBtn:SetPoint("TOPLEFT", 18, -318)
     tomeBtn:SetWidth(304); tomeBtn:SetHeight(22)
     tomeBtn:SetText('Whitelist all "Tome of Echo:" in bags')
     tomeBtn:SetScript("OnClick", EAL_WhitelistTomes)
@@ -777,7 +855,7 @@ local function EAL_BuildGUI()
     -- ----------------------------------------------------------------
     local TRACK_W = 8   -- width of the slim scrollbar track on the right
     local listBg = CreateFrame("Frame", nil, win)
-    listBg:SetPoint("TOPLEFT", 14, -318)
+    listBg:SetPoint("TOPLEFT", 14, -346)
     listBg:SetWidth(312); listBg:SetHeight(MAX_ROWS * ROW_HEIGHT + 8)
     listBg:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -894,7 +972,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
         end
         gui       = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
-        Print("v2.9 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v3.0 loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
