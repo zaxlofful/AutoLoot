@@ -1,6 +1,6 @@
-# EbonholdAutoLoot
+# AutoLoot
 
-A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cycle using two custom companion pets: the **Greedy Scavenger** (auto-looter) and the **Goblin Merchant** (vendor).
+A player-created WoW 3.3.5a addon for **Project Ebonhold** that automates the loot-and-sell cycle using two custom companion pets: the **Greedy Scavenger** (auto-looter) and the **Goblin Merchant** (vendor).
 
 ---
 
@@ -24,7 +24,7 @@ A WoW 3.3.5a AddOn for **Project Ebonhold** that automates the loot-and-sell cyc
 ## Installation
 
 1. Download or clone this repository.
-2. Place the `EbonholdAutoLoot` folder into:
+2. Place the `AutoLoot` folder into:
    ```
    World of Warcraft/Interface/AddOns/
    ```
@@ -75,7 +75,7 @@ The button can be shown or hidden at any time from the **Show/Hide Vendor Btn** 
 
 ```
 ┌─────────────────────────────────────────┐
-│        Ebonhold AutoLoot & Sell         │
+│           AutoLoot & Sell               │
 ├─────────────────────────────────────────┤
 │ Status: LOOTING  Free Slots: 12         │
 │                        [ ] Fast Mode    │

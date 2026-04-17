@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- EbonholdAutoLoot  v3.1
+-- AutoLoot  v3.1
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -21,7 +21,7 @@
 -- Slash commands:  /eal   /autoloot
 -------------------------------------------------------------------------------
 
-local ADDON_NAME      = "EbonholdAutoLoot"
+local ADDON_NAME      = "AutoLoot"
 local LOOT_PET_NAME   = "Greedy Scavenger"
 local VENDOR_PET_NAME = "Goblin Merchant"
 
@@ -523,6 +523,74 @@ local function CheckCompanionStuck()
     end
 end
 
+-- Scans all bags for Rare-quality items that have no vendor sell price and are
+-- not on the whitelist, then deletes them one at a time using the same async
+-- popup-confirm pattern as EAL_DeleteSavageGear.
+-- g_deletingRares prevents re-entrant calls from the bag-check timer.
+local g_deletingRares = false
+
+local function EAL_DeleteUnsellableRares()
+    if g_deletingRares or InCombatLockdown() then return end
+
+    local toDelete = {}
+    for bag = 0, 4 do
+        local numSlots = GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local link = GetContainerItemLink(bag, slot)
+            if link then
+                local name, _, quality, _, _, _, _, _, _, _, vendorPrice = GetItemInfo(link)
+                if name
+                    and quality == Q_RARE
+                    and (not vendorPrice or vendorPrice == 0)
+                    and not IsBlacklisted(name)
+                then
+                    table.insert(toDelete, { bag = bag, slot = slot })
+                end
+            end
+        end
+    end
+
+    if #toDelete == 0 then return end
+
+    g_deletingRares = true
+    local total = #toDelete
+
+    local function DeleteNext(idx)
+        if idx > #toDelete then
+            g_deletingRares = false
+            Print("|cffffff00" .. total .. "|r unsellable rare(s) with no sell price deleted.")
+            return
+        end
+        local item = toDelete[idx]
+        local link = GetContainerItemLink(item.bag, item.slot)
+        if link then
+            local name, _, quality, _, _, _, _, _, _, _, vendorPrice = GetItemInfo(link)
+            if name
+                and quality == Q_RARE
+                and (not vendorPrice or vendorPrice == 0)
+                and not IsBlacklisted(name)
+            then
+                ClearCursor()
+                PickupContainerItem(item.bag, item.slot)
+                DeleteCursorItem()
+                After(0.05, function()
+                    local popup = StaticPopup_FindVisible("DELETE_ITEM")
+                    if popup then
+                        local btn = _G[popup .. "Button1"]
+                        if btn then btn:Click() end
+                    end
+                    After(0.15, function() DeleteNext(idx + 1) end)
+                end)
+                return
+            end
+        end
+        -- Slot empty or item changed — skip
+        DeleteNext(idx + 1)
+    end
+
+    DeleteNext(1)
+end
+
 -- Per-frame bag check + mount detection
 local function OnUpdate(self, elapsed)
     if not EAL_DB then return end
@@ -560,6 +628,8 @@ local function OnUpdate(self, elapsed)
         if bagCheckTimer >= (EAL_DB.checkInterval or 3) then
             bagCheckTimer = 0
             EAL_UpdateStatus()
+            -- Delete unsellable rares on every tick, regardless of bag state
+            EAL_DeleteUnsellableRares()
             if GetTotalFreeSlots() == 0 then
                 StartSellCycle()
             else
@@ -702,7 +772,7 @@ local function EAL_BuildGUI()
     -- Title bar
     local title = win:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -14)
-    title:SetText("|cffff9900Ebonhold|r AutoLoot |cffaaaaaa& Sell|r")
+    title:SetText("AutoLoot |cffaaaaaa& Sell|r")
 
     local closeBtn = CreateFrame("Button", nil, win, "UIPanelCloseButton")
     closeBtn:SetPoint("TOPRIGHT", -4, -4)
