@@ -88,7 +88,7 @@ local g_statusLabel
 local g_enableBtn
 local g_vendorBtn                 -- on-screen SecureActionButton (UIParent child)
 local g_vendorBtnToggle           -- GUI button that shows/hides g_vendorBtn
-local gui
+local gui                         -- shared GUI upvalue; do not redeclare later
 local g_blacklistRows   = {}
 local g_blacklistOffset = 0   -- hand-rolled scroll offset (no FauxScrollFrame)
 local g_scrollThumb               -- visual-only scrollbar thumb
