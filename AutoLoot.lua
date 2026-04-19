@@ -369,7 +369,7 @@ local function ToggleGUI()
         gui:Hide()
     else
         EAL_UpdateStatus()
-        EAL_RefreshWhitelist()
+        EAL_RefreshBlacklist()
         gui:Show()
     end
 end
