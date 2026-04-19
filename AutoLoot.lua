@@ -23,7 +23,7 @@
 
 local ADDON_NAME      = "AutoLoot"
 -- Load ADDON version from toc file metadata
-local ADDON_VERSION   = GetAddOnMetadata(ADDON_NAME, "Version")
+local ADDON_VERSION   = GetAddOnMetadata(ADDON_NAME, "Version") or "?"
 local LOOT_PET_NAME   = "Greedy Scavenger"
 local VENDOR_PET_NAME = "Goblin Merchant"
 
@@ -333,7 +333,7 @@ local TOME_PREFIX       = "Tome of Echo:"
 local TOME_PREFIX_LOWER = TOME_PREFIX:lower()
 
 -- Scans all bag slots and adds every item whose name starts with
--- "Tome of Echo:" to the whitelist (if not already present).
+-- "Tome of Echo:" to the blacklist (if not already present).
 local function EAL_WhitelistTomes()
     local added = 0
     for bag = 0, 4 do
@@ -343,8 +343,8 @@ local function EAL_WhitelistTomes()
             if link then
                 local name = GetItemInfo(link)
                 if name and name:lower():sub(1, #TOME_PREFIX_LOWER) == TOME_PREFIX_LOWER then
-                    if not IsWhitelisted(name) then
-                        table.insert(EAL_DB.whitelist, name)
+                    if not IsBlacklisted(name) then
+                        table.insert(EAL_DB.blacklist, name)
                         added = added + 1
                     end
                 end
@@ -352,7 +352,7 @@ local function EAL_WhitelistTomes()
         end
     end
     if added > 0 then
-        EAL_RefreshWhitelist()
+        EAL_RefreshBlacklist()
         Print("|cffffff00" .. added .. "|r Tome of Echo item(s) whitelisted.")
     else
         Print("No new Tome of Echo items found in bags (already whitelisted or not in bags).")
