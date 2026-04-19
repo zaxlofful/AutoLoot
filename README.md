@@ -23,10 +23,10 @@ A player-created WoW 3.3.5a addon for **Project Ebonhold** that automates the lo
 
 ## Installation
 
-1. Download or clone this repository.
+1. Download the latest release from: [GitHub Releases](../../releases/latest)
 2. Place the `AutoLoot` folder into:
    ```
-   World of Warcraft/Interface/AddOns/
+   Ebonhold/Interface/AddOns/
    ```
 3. Launch WoW and enable the addon from the AddOns menu on the character select screen.
 
