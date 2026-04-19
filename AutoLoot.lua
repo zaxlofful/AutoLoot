@@ -646,10 +646,11 @@ local function OnUpdate(self, elapsed)
         bagCheckTimer = bagCheckTimer + elapsed
         if bagCheckTimer >= (EAL_DB.checkInterval or 3) then
             bagCheckTimer = 0
-            local free = GetTotalFreeSlots()
-            EAL_UpdateStatus(free)
             -- Delete unsellable rares on every tick, regardless of bag state
             EAL_DeleteUnsellableRares()
+            
+            local free = GetTotalFreeSlots()
+            EAL_UpdateStatus(free)
             if free == 0 then
                 StartSellCycle()
             else
@@ -1071,8 +1072,6 @@ end
 -------------------------------------------------------------------------------
 -- 8. EVENT FRAME
 -------------------------------------------------------------------------------
-local gui
-
 local eventFrame = CreateFrame("Frame", "EAL_EventFrame", UIParent)
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
@@ -1102,7 +1101,7 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 end
             end
         end
-        gui       = EAL_BuildGUI()
+        gui = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
         Print("v" .. ADDON_VERSION .. " loaded.  |cffffff00/eal|r to open settings.")
 
