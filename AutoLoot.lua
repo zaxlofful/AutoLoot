@@ -1,5 +1,5 @@
 -------------------------------------------------------------------------------
--- AutoLoot  v3.1
+-- AutoLoot  v3.2
 --
 -- Automatically loots using the Greedy Scavenger companion pet, then switches
 -- to the Goblin Merchant companion to sell unwanted items when bags are full.
@@ -22,6 +22,8 @@
 -------------------------------------------------------------------------------
 
 local ADDON_NAME      = "AutoLoot"
+-- Load ADDON version from toc file metadata
+local ADDON_VERSION   = GetAddOnMetadata(ADDON_NAME, "Version") or "?"
 local LOOT_PET_NAME   = "Greedy Scavenger"
 local VENDOR_PET_NAME = "Goblin Merchant"
 
@@ -86,6 +88,7 @@ local g_statusLabel
 local g_enableBtn
 local g_vendorBtn                 -- on-screen SecureActionButton (UIParent child)
 local g_vendorBtnToggle           -- GUI button that shows/hides g_vendorBtn
+local gui                         -- shared GUI upvalue; do not redeclare later
 local g_blacklistRows   = {}
 local g_blacklistOffset = 0   -- hand-rolled scroll offset (no FauxScrollFrame)
 local g_scrollThumb               -- visual-only scrollbar thumb
@@ -139,9 +142,6 @@ local function IsBlacklisted(itemName)
     end
     return false
 end
-
-local TOME_PREFIX       = "Tome of Echo:"
-local TOME_PREFIX_LOWER = TOME_PREFIX:lower()
 
 local SAVAGE_PREFIX_LOWER = "savage "
 
@@ -209,33 +209,6 @@ local function EAL_DeleteSavageGear()
     DeleteNext(1)
 end
 
--- Scans all bag slots and adds every item whose name starts with
--- "Tome of Echo:" to the blacklist (if not already present).
-local function EAL_WhitelistTomes()
-    local added = 0
-    for bag = 0, 4 do
-        local numSlots = GetContainerNumSlots(bag)
-        for slot = 1, numSlots do
-            local link = GetContainerItemLink(bag, slot)
-            if link then
-                local name = GetItemInfo(link)
-                if name and name:lower():sub(1, #TOME_PREFIX_LOWER) == TOME_PREFIX_LOWER then
-                    if not IsBlacklisted(name) then
-                        table.insert(EAL_DB.blacklist, name)
-                        added = added + 1
-                    end
-                end
-            end
-        end
-    end
-    if added > 0 then
-        EAL_RefreshBlacklist()
-        Print("|cffffff00" .. added .. "|r Tome of Echo item(s) whitelisted.")
-    else
-        Print("No new Tome of Echo items found in bags (already whitelisted or not in bags).")
-    end
-end
-
 -- Returns companion index (1-based) and whether it is currently summoned.
 -- Comparison is case-insensitive so "Greedy scavenger" matches "Greedy Scavenger".
 local function FindCompanion(name)
@@ -291,8 +264,9 @@ end
 -------------------------------------------------------------------------------
 -- 3. STATUS / GUI REFRESH
 -------------------------------------------------------------------------------
-local function EAL_UpdateStatus()
+local function EAL_UpdateStatus(free)
     if not g_statusLabel then return end
+    free = free or GetTotalFreeSlots()
 
     local stateColor
     if     currentState == S_IDLE    then stateColor = "|cffaaaaaa"
@@ -301,7 +275,6 @@ local function EAL_UpdateStatus()
     else                                  stateColor = "|cffaaaaaa"
     end
 
-    local free      = GetTotalFreeSlots()
     local freeColor = (free == 0) and "|cffff4444" or (free <= 4 and "|cffff9900" or "|cffffff00")
 
     g_statusLabel:SetText(
@@ -352,6 +325,51 @@ local function EAL_RefreshBlacklist()
             g_scrollThumb:SetPoint("TOP", 0, thumbY)
             g_scrollThumb:Show()
         end
+    end
+end
+
+local TOME_PREFIX       = "Tome of Echo:"
+local TOME_PREFIX_LOWER = TOME_PREFIX:lower()
+
+-- Scans all bag slots and adds every item whose name starts with
+-- "Tome of Echo:" to the blacklist (if not already present).
+local function EAL_WhitelistTomes()
+    local added = 0
+    for bag = 0, 4 do
+        local numSlots = GetContainerNumSlots(bag)
+        for slot = 1, numSlots do
+            local link = GetContainerItemLink(bag, slot)
+            if link then
+                local name = GetItemInfo(link)
+                if name and name:lower():sub(1, #TOME_PREFIX_LOWER) == TOME_PREFIX_LOWER then
+                    if not IsBlacklisted(name) then
+                        table.insert(EAL_DB.blacklist, name)
+                        added = added + 1
+                    end
+                end
+            end
+        end
+    end
+    if added > 0 then
+        EAL_RefreshBlacklist()
+        Print("|cffffff00" .. added .. "|r Tome of Echo item(s) whitelisted.")
+    else
+        Print("No new Tome of Echo items found in bags (already whitelisted or not in bags).")
+    end
+end
+
+local function ToggleGUI()
+    if not gui then
+        Print("GUI not ready yet.", 1, 0.5, 0.5)
+        return
+    end
+
+    if gui:IsShown() then
+        gui:Hide()
+    else
+        EAL_UpdateStatus()
+        EAL_RefreshBlacklist()
+        gui:Show()
     end
 end
 
@@ -627,10 +645,12 @@ local function OnUpdate(self, elapsed)
         bagCheckTimer = bagCheckTimer + elapsed
         if bagCheckTimer >= (EAL_DB.checkInterval or 3) then
             bagCheckTimer = 0
-            EAL_UpdateStatus()
             -- Delete unsellable rares on every tick, regardless of bag state
             EAL_DeleteUnsellableRares()
-            if GetTotalFreeSlots() == 0 then
+
+            local free = GetTotalFreeSlots()
+            EAL_UpdateStatus(free)
+            if free == 0 then
                 StartSellCycle()
             else
                 -- Only run stuck check when we're not already switching to sell;
@@ -662,7 +682,9 @@ local function EAL_BuildVendorButton()
     btn:RegisterForClicks("AnyUp")
     btn:SetFrameStrata("MEDIUM")
 
-    -- Attribute locked in at creation — valid during combat lockdown
+    -- Attributes locked in at creation — valid during combat lockdown.
+    -- Plain clicks target the vendor; Ctrl-clicks also run the target macro,
+    -- then the PostClick hook additionally toggles the settings GUI.
     btn:SetAttribute("type", "macro")
     btn:SetAttribute("macrotext", "/target " .. VENDOR_PET_NAME)
 
@@ -694,12 +716,20 @@ local function EAL_BuildVendorButton()
         EAL_DB.vendorBtnY = self:GetTop() - UIParent:GetHeight()
     end)
 
+    -- Ctrl+Click opens the main settings GUI without replacing the secure click handler
+    btn:HookScript("PostClick", function(self, button)
+        if IsControlKeyDown() then
+            ToggleGUI()
+        end
+    end)
+
     -- Tooltip
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine("|cffff9900Target Goblin Merchant|r")
         GameTooltip:AddLine("|cffaaaaaaClick to target the vendor companion|r")
         GameTooltip:AddLine("|cffaaaaaaThen press Interact with Target to sell|r")
+        GameTooltip:AddLine("|cffaaaaaaCtrl+Click to target the vendor and open settings|r")
         GameTooltip:AddLine("|cffaaaaaaAlt+Drag to reposition|r")
         GameTooltip:Show()
     end)
@@ -1040,8 +1070,6 @@ end
 -------------------------------------------------------------------------------
 -- 8. EVENT FRAME
 -------------------------------------------------------------------------------
-local gui
-
 local eventFrame = CreateFrame("Frame", "EAL_EventFrame", UIParent)
 eventFrame:RegisterEvent("ADDON_LOADED")
 eventFrame:RegisterEvent("PLAYER_LOGIN")
@@ -1071,9 +1099,9 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 end
             end
         end
-        gui       = EAL_BuildGUI()
+        gui = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
-        Print("v3.1 loaded.  |cffffff00/eal|r to open settings.")
+        Print("v" .. ADDON_VERSION .. " loaded.  |cffffff00/eal|r to open settings.")
 
     elseif event == "MERCHANT_SHOW" then
         OnMerchantShow()
@@ -1112,12 +1140,6 @@ SlashCmdList["EBAUTOLOOT"] = function(msg)
         DismissPet()
         SetState(S_IDLE)
     else
-        if gui:IsShown() then
-            gui:Hide()
-        else
-            EAL_UpdateStatus()
-            EAL_RefreshBlacklist()
-            gui:Show()
-        end
+        ToggleGUI()
     end
 end

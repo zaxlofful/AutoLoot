@@ -1,4 +1,18 @@
-# Changelog — EbonholdAutoLoot
+# Changelog — AutoLoot
+
+## [3.2] - 2026-04-21
+
+### Added
+- **Ctrl+Click on vendor button** — holding Ctrl while clicking the on-screen Vendor button now also opens the settings GUI via a `PostClick` hook, without interfering with the secure `/target Goblin Merchant` macro. Tooltip updated to document the shortcut.
+
+### Changed
+- **Version loaded from TOC metadata** — `GetAddOnMetadata(ADDON_NAME, "Version")` replaces the hardcoded version string in the startup chat message. The `.toc` file is now the single source of truth for the version number.
+- **`ToggleGUI()` helper introduced** — GUI show/hide logic extracted into a reusable function. The `/eal` slash command and the new Ctrl+Click handler both call it, eliminating duplicated code.
+- **`OnUpdate` free-slot optimization** — `GetTotalFreeSlots()` is called once per tick and the result passed to `EAL_UpdateStatus(free)` instead of being computed twice in the same loop iteration.
+- **Load-order fix for `EAL_WhitelistTomes`** — `TOME_PREFIX` constants and `EAL_WhitelistTomes()` moved to after `EAL_RefreshBlacklist()` (the function they depend on) to eliminate a load-order error.
+- **Installation instructions** — README now links to the latest GitHub release and corrects the addon path to `Ebonhold/Interface/AddOns/`.
+
+---
 
 ## [3.1] - 2026-04-16
 

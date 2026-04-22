@@ -23,10 +23,10 @@ A player-created WoW 3.3.5a addon for **Project Ebonhold** that automates the lo
 
 ## Installation
 
-1. Download or clone this repository.
+1. Download the latest release from: [GitHub Releases](../../releases/latest)
 2. Place the `AutoLoot` folder into:
    ```
-   World of Warcraft/Interface/AddOns/
+   Ebonhold/Interface/AddOns/
    ```
 3. Launch WoW and enable the addon from the AddOns menu on the character select screen.
 
@@ -109,6 +109,7 @@ The button can be shown or hidden at any time from the **Show/Hide Vendor Btn** 
 
 | Version | Notes |
 |---|---|
+| 3.2 | Ctrl+Click on vendor button opens settings GUI. Version loaded from TOC metadata. `ToggleGUI()` helper replaces duplicated show/hide logic. `OnUpdate` free-slot caching. Load-order fix for `EAL_WhitelistTomes`. README installation instructions corrected (PR #5 & #6 by @zaxlofful). |
 | 3.1 | Added **Fast Mode** toggle (PR #4 by @zaxlofful) — doubles items sold per batch and halves inter-batch delay. Replaces the separate high-end release. |
 | 3.0 | Added "Delete All Savage PvP Gear" button — async one-at-a-time deletion with auto-confirmation of quality popups. |
 | 2.9 | Reduced batch size to 45 items and increased inter-batch delay to 1.0 s to prevent disconnects on large inventories (PR #1 by @zaxlofful). Added `FinishSelling` helper and guard for vendor closing mid-batch. Status bar now refreshes every bag-check tick. High-end release also available (80 items / 0.5 s). |
