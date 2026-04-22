@@ -38,6 +38,7 @@ local QUALITY_LABEL = { [0]="Grey", [1]="White", [2]="Uncommon", [3]="Rare", [4]
 local QUALITY_HEX   = { [0]="9d9d9d", [1]="ffffff", [2]="1eff00", [3]="0070dd", [4]="a335ee" }
 
 -- State machine values
+local S_DISABLED = "DISABLED"
 local S_IDLE    = "IDLE"
 local S_LOOTING = "LOOTING"
 local S_SELLING = "SELLING"
@@ -78,7 +79,7 @@ local DEFAULTS = {
 -- Runtime state
 -------------------------------------------------------------------------------
 local EAL_DB             -- assigned from SavedVariables on ADDON_LOADED
-local currentState       = S_IDLE
+local currentState       = S_DISABLED
 local bagCheckTimer      = 0
 local waitingForMerchant = false
 local wasMounted         = false  -- previous-frame mount state for change detection
@@ -269,9 +270,10 @@ local function EAL_UpdateStatus(free)
     free = free or GetTotalFreeSlots()
 
     local stateColor
-    if     currentState == S_IDLE    then stateColor = "|cffaaaaaa"
-    elseif currentState == S_LOOTING then stateColor = "|cff44ff44"
-    elseif currentState == S_SELLING then stateColor = "|cffff9900"
+    if     currentState == S_DISABLED then stateColor = "|cffff4444"
+    elseif currentState == S_IDLE     then stateColor = "|cffaaaaaa"
+    elseif currentState == S_LOOTING  then stateColor = "|cff44ff44"
+    elseif currentState == S_SELLING  then stateColor = "|cffff9900"
     else                                  stateColor = "|cffaaaaaa"
     end
 
@@ -621,7 +623,7 @@ local function OnUpdate(self, elapsed)
         if nowMounted then
             -- Just mounted: dismiss whichever companion is currently out
             DismissPet()
-            if currentState ~= S_IDLE then
+            if EAL_DB.enabled and currentState ~= S_IDLE then
                 Print("Mounted — companion dismissed.")
             end
         else
@@ -857,7 +859,7 @@ local function EAL_BuildGUI()
             StartLootCycle()
         else
             DismissPet()
-            SetState(S_IDLE)
+            SetState(S_DISABLED)
         end
         EAL_UpdateStatus()
     end)
@@ -1099,6 +1101,10 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
                 end
             end
         end
+
+        -- Always start disabled on login, regardless of prior session state.
+        EAL_DB.enabled = false
+
         gui = EAL_BuildGUI()
         g_vendorBtn = EAL_BuildVendorButton()
         Print("v" .. ADDON_VERSION .. " loaded.  |cffffff00/eal|r to open settings.")
@@ -1138,7 +1144,7 @@ SlashCmdList["EBAUTOLOOT"] = function(msg)
     elseif cmd == "disable" then
         EAL_DB.enabled = false
         DismissPet()
-        SetState(S_IDLE)
+        SetState(S_DISABLED)
     else
         ToggleGUI()
     end
