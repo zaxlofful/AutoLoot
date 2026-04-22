@@ -44,6 +44,8 @@ local S_SELLING = "SELLING"
 
 -- Companion stuck detection
 local MAX_COMPANION_DISTANCE = 5   -- yards; resummon if pet exceeds this from player
+local SUMMON_VERIFY_DELAY    = 0.8 -- seconds to wait before verifying summon success
+local MAX_SUMMON_RETRIES     = 3
 
 -- Per-pulse sell cap: avoids flooding the server with too many UseContainerItem
 -- calls in a single MERCHANT_SHOW callback, which can cause low-end clients to
@@ -234,6 +236,43 @@ local function SummonPet(name)
         Print("Summoning " .. name .. "...")
     end
     return true
+end
+
+-- Attempts to summon a companion and verifies it actually becomes active.
+-- Retries up to maxAttempts, then reports failure through callback.
+local function EnsurePetSummoned(name, maxAttempts, onDone)
+    maxAttempts = maxAttempts or MAX_SUMMON_RETRIES
+    local attempt = 0
+
+    local function TrySummon()
+        attempt = attempt + 1
+
+        local ok = SummonPet(name)
+        if not ok then
+            if onDone then onDone(false) end
+            return
+        end
+
+        After(SUMMON_VERIFY_DELAY, function()
+            local _, active = FindCompanion(name)
+            if active then
+                if onDone then onDone(true) end
+                return
+            end
+
+            if attempt < maxAttempts then
+                Print(name .. " did not appear (attempt " .. attempt .. "/" ..
+                      maxAttempts .. "), retrying...", 1, 0.85, 0.2)
+                TrySummon()
+            else
+                Print("Failed to summon " .. name .. " after " .. maxAttempts ..
+                      " attempts.", 1, 0.3, 0.3)
+                if onDone then onDone(false) end
+            end
+        end)
+    end
+
+    TrySummon()
 end
 
 local function DismissPet()
@@ -464,7 +503,12 @@ local function StartLootCycle()
     SetState(S_LOOTING)
     bagCheckTimer = 0
     Print("Loot cycle started. Summoning " .. LOOT_PET_NAME .. "...")
-    SummonPet(LOOT_PET_NAME)
+    EnsurePetSummoned(LOOT_PET_NAME, MAX_SUMMON_RETRIES, function(ok)
+        if not ok and EAL_DB and EAL_DB.enabled and currentState == S_LOOTING then
+            Print("Loot companion failed to appear. Will keep trying during the next bag checks.",
+                  1, 0.7, 0.2)
+        end
+    end)
 end
 
 local function StartSellCycle()
@@ -474,23 +518,28 @@ local function StartSellCycle()
     DismissPet()
 
     After(1.5, function()
-        local ok = SummonPet(VENDOR_PET_NAME)
-        if ok then
-            waitingForMerchant = true
-            -- If in combat, prompt the player to click the secure button / macro
-            if InCombatLockdown() then
-                Print("|cffffd700In combat:|r click |cffffff00Target Vendor|r to select the merchant," ..
-                      " then |cffffd700right-click its model|r or press your" ..
-                      " |cffffff00Interact with Target|r keybind to open the vendor.")
-            end
-            -- Remind after 8 seconds if window still hasn't opened
-            After(8, function()
-                if waitingForMerchant and currentState == S_SELLING then
-                    Print("|cffffd700Reminder:|r target " .. VENDOR_PET_NAME ..
-                          " then right-click it or press Interact with Target.", 1, 1, 0)
+        EnsurePetSummoned(VENDOR_PET_NAME, MAX_SUMMON_RETRIES, function(ok)
+            if ok then
+                waitingForMerchant = true
+                -- If in combat, prompt the player to click the secure button / macro
+                if InCombatLockdown() then
+                    Print("|cffffd700In combat:|r click |cffffff00Target Vendor|r to select the merchant," ..
+                          " then |cffffd700right-click its model|r or press your" ..
+                          " |cffffff00Interact with Target|r keybind to open the vendor.")
                 end
-            end)
-        end
+                -- Remind after 8 seconds if window still hasn't opened
+                After(8, function()
+                    if waitingForMerchant and currentState == S_SELLING then
+                        Print("|cffffd700Reminder:|r target " .. VENDOR_PET_NAME ..
+                              " then right-click it or press Interact with Target.", 1, 1, 0)
+                    end
+                end)
+            else
+                waitingForMerchant = false
+                Print("Vendor companion failed to appear, sell cycle paused.", 1, 0.3, 0.3)
+                SetState(S_IDLE)
+            end
+        end)
     end)
 end
 
@@ -536,7 +585,7 @@ local function CheckCompanionStuck()
               " yds away) — resummoning...", 1, 0.75, 0.2)
         DismissPet()
         After(0.5, function()
-            SummonPet(LOOT_PET_NAME)
+            EnsurePetSummoned(LOOT_PET_NAME)
         end)
     end
 end
@@ -630,11 +679,11 @@ local function OnUpdate(self, elapsed)
             if EAL_DB.enabled then
                 if currentState == S_LOOTING then
                     Print("Dismounted — re-summoning " .. LOOT_PET_NAME .. "...")
-                    After(1.5, function() SummonPet(LOOT_PET_NAME) end)
+                    After(1.5, function() EnsurePetSummoned(LOOT_PET_NAME) end)
                 elseif currentState == S_SELLING then
                     Print("Dismounted — re-summoning " .. VENDOR_PET_NAME .. "...")
                     waitingForMerchant = true
-                    After(1.5, function() SummonPet(VENDOR_PET_NAME) end)
+                    After(1.5, function() EnsurePetSummoned(VENDOR_PET_NAME) end)
                 end
             end
         end
@@ -653,6 +702,11 @@ local function OnUpdate(self, elapsed)
             if free == 0 then
                 StartSellCycle()
             else
+                local lootActive = FindCompanion(LOOT_PET_NAME)
+                if not lootActive then
+                    Print("Loot companion missing, attempting re-summon...", 1, 0.85, 0.2)
+                    EnsurePetSummoned(LOOT_PET_NAME)
+                end
                 -- Only run stuck check when we're not already switching to sell;
                 -- avoids a dismiss colliding with the sell-cycle dismiss.
                 CheckCompanionStuck()
